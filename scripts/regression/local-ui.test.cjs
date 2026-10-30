@@ -62,6 +62,7 @@ async function assertInitialReading(page, name) {
  // No scrollIntoView: capture the actual post-submit first screen, not a curated scroll position.
  await page.clock.runFor(500);
  await page.screenshot({path:`test-results/${name}-first-screen.png`,fullPage:false});
+ assert.equal(await page.evaluate(()=>window.scrollY),0,`${name}: birth submission starts at real page top`);
  const summary=page.getByRole('region',{name:'本地十三维解读'}).getByTestId('reading-summary');
  await assertPainted(summary,`${name} first-screen summary`);
  const rect=await summary.evaluate(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:innerHeight};});
@@ -134,11 +135,17 @@ async function assertInitialReading(page, name) {
    await assertChartPainted(mobile,`mobile ${width}px`);
    const overflow=await mobile.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
    assert.ok(overflow.scroll<=overflow.width+1,`no document horizontal overflow at ${width}px: ${JSON.stringify(overflow)}`);
-   const palace=mobile.locator('.chart-pane button[aria-label^="选择"]').first();
+   const palace=mobile.locator('.chart-pane button[aria-label^="选择"]').nth(width===350?0:1);
    await palace.focus();await palace.press('Enter');
    assert.equal(await mobile.getByRole('button',{name:'命盘分析',exact:true}).getAttribute('aria-pressed'),'true','keyboard palace selection opens its interpretation');
    await assertReading(mobile.getByRole('region',{name:'本地十三维解读'}));
    await mobile.screenshot({path:`test-results/mobile-${width}-reading.png`,fullPage:false});
+   // A repeated activation intentionally deselects; it must not masquerade as selecting a new topic.
+   await mobile.getByRole('button',{name:'命盘',exact:true}).click();
+   await palace.focus();await palace.press('Enter');
+   assert.equal(await palace.getAttribute('aria-pressed'),'false','repeat keyboard activation clears palace selection');
+   assert.equal(await mobile.getByRole('button',{name:'命盘',exact:true}).getAttribute('aria-pressed'),'true','deselection keeps chart open');
+   await mobile.getByRole('button',{name:'命盘分析',exact:true}).click();
   }
   await mobileContext.setOffline(true);
   await mobile.getByLabel('分析时序',{exact:true}).selectOption('liunian');

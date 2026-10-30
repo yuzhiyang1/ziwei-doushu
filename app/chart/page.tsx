@@ -1,5 +1,5 @@
 'use client';
-import {useRef,useState} from 'react';
+import {useLayoutEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {useTheme} from '@/components/ThemeProvider';
 import PrintableReport from '@/components/PrintableReport';
@@ -20,8 +20,9 @@ import {BRANCHES} from '@/lib/ziwei/constants';
 import type {BirthInfo,ZiweiChart,Palace} from '@/lib/ziwei/types';
 export default function ChartPage(){
  const {theme,toggle}=useTheme();const [chart,setChart]=useState<ZiweiChart|null>(null),[selectedPalace,setSelectedPalace]=useState<Palace|null>(null);
- const [selection,setSelection]=useState<TimeSelection>(()=>defaultTimeSelection()),[message,setMessage]=useState(''),[capturing,setCapturing]=useState(false),[view,setView]=useState<'analysis'|'chart'|'ai'>('analysis');const lock=useRef(false);
- const load=(birth:BirthInfo)=>{try{const c=generateLocalChart(birth);setChart(c);setSelection(defaultTimeSelection(c));setSelectedPalace(null);setView('analysis');setMessage('命盘与十三维分析已生成');window.scrollTo({top:0,behavior:'smooth'});}catch(e){setMessage(e instanceof Error?e.message:'排盘失败');}};
+ const [selection,setSelection]=useState<TimeSelection>(()=>defaultTimeSelection()),[message,setMessage]=useState(''),[capturing,setCapturing]=useState(false),[view,setView]=useState<'analysis'|'chart'|'ai'>('analysis');const lock=useRef(false),scrollAfterLoad=useRef(false);
+ useLayoutEffect(()=>{if(chart&&scrollAfterLoad.current){scrollAfterLoad.current=false;window.scrollTo({top:0,behavior:'instant'});}},[chart]);
+ const load=(birth:BirthInfo)=>{try{const c=generateLocalChart(birth);scrollAfterLoad.current=true;setChart(c);setSelection(defaultTimeSelection(c));setSelectedPalace(null);setView('analysis');setMessage('命盘与十三维分析已生成');}catch(e){setMessage(e instanceof Error?e.message:'排盘失败');}};
  const context=chart?resolveTimeContext(chart,selection):null;
  const report=()=>{if(!chart)return;const readings=buildReadableAnalysis(chart,selection,context??undefined);const text=readings.map(r=>`## ${r.title}\n${r.headline}\n${r.summary}\n特点：${r.strengths.join('；')}\n留意：${r.watchouts.join('；')}\n建议：${r.suggestions.join('；')}`).join('\n\n')+'\n\n'+formatPeriodReport(chart,selection,context??undefined);const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));downloadDataURL(url,'紫微个人研究报告.txt');setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const png=async()=>{if(lock.current)return;lock.current=true;setCapturing(true);try{const data=await captureShareCard();if(!data)throw new Error('PNG生成失败，请重试');downloadDataURL(data,'紫微本命盘.png');setMessage('本命盘 PNG 已生成');}catch(e){setMessage(e instanceof Error?e.message:'导出失败');}finally{lock.current=false;setCapturing(false);}};
