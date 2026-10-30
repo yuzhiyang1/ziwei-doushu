@@ -1,10 +1,11 @@
+import { localSihuaByStem } from './local-school-patches';
 import { astro } from 'iztro';
 import { Solar } from 'lunar-javascript';
 import { resolveEffectiveLunarDate, type LunarMonthPolicy } from './ziwei/algorithm';
 import { BRANCHES, PALACE_NAMES_ORDER, SI_HUA_TABLE, STEMS } from './ziwei/constants';
 import { DEFAULT_LEAP_MONTH } from './ziwei/school-config';
 import { getDaXianIndexForYear } from './ziwei/yunxian-context';
-import type { ZiweiChart } from './ziwei/types';
+import type { LocalSchoolConfig, ZiweiChart } from './ziwei/types';
 
 export type TimeView = 'mingpan' | 'daxian' | 'liunian' | 'liuyue' | 'liuri' | 'liushi';
 export interface TimeSelection { view: TimeView; date: string; hour: number; daXianIndex: number }
@@ -21,8 +22,9 @@ export function parseTimeDate(date: string): [number, number, number] {
   return [y,m,d];
 }
 export function getYearStemIndex(year: number): number { return ((year-4)%10+10)%10; }
-export function buildSiHuaOverlay(stem: number): Record<string,string> {
-  const stars=SI_HUA_TABLE[stem];
+export function buildSiHuaOverlay(stem: number,config?:LocalSchoolConfig): Record<string,string> {
+  const hua=localSihuaByStem(stem,config);
+  const stars=[hua.lu,hua.quan,hua.ke,hua.ji];
   return stars ? Object.fromEntries(stars.map((s,i)=>[s,['禄','权','科','忌'][i]])) : {};
 }
 export interface TimeContext {
@@ -41,7 +43,7 @@ export function resolveTimeContext(chart: ZiweiChart, selection: TimeSelection):
     const dx=chart.daXians[selection.daXianIndex];
     if(!dx) throw new Error('请选择有效大限');
     const palace=chart.palaces.find(p=>p.branch===dx.palaceBranch)!;
-    base.overlay=buildSiHuaOverlay(palace.stem);
+    base.overlay=buildSiHuaOverlay(palace.stem,chart.birthInfo.schoolConfig);
     base.mingBranch=palace.branch;
     base.effectiveDaXianIndex=selection.daXianIndex;
     for(let i=0;i<12;i++) base.palaceNames[(palace.branch-i+12)%12]=PALACE_NAMES_ORDER[i];
@@ -61,7 +63,7 @@ export function resolveTimeContext(chart: ZiweiChart, selection: TimeSelection):
   period.palaceNames.forEach((name,i)=>{base.palaceNames[(i+2)%12]=name;});
   period.stars?.forEach((stars,i)=>{base.transitStars[(i+2)%12]=stars.map(s=>s.name);});
   // Keep the repository's established four-transformations table across all layers.
-  base.overlay=buildSiHuaOverlay(STEMS.indexOf(period.heavenlyStem));
+  base.overlay=buildSiHuaOverlay(STEMS.indexOf(period.heavenlyStem),chart.birthInfo.schoolConfig);
   const selectedLunar=Solar.fromYmd(year,month,day).getLunar();
   base.effectiveDaXianIndex=getDaXianIndexForYear(chart,selectedLunar.getYear());
   base.description=`${base.label}：公历${selection.date} ${BRANCHES[selection.hour]}时；农历${selectedLunar.getYear()}年${selectedLunar.getMonth()}月${selectedLunar.getDay()}日；${period.heavenlyStem}${period.earthlyBranch}，运限命宫在${BRANCHES[base.mingBranch]}。运限宫位/流曜来自iztro，四化沿用本仓库表；日期为所选公历日，不把公历年误作农历流年。`;

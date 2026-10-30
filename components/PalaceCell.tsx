@@ -92,6 +92,7 @@ export default function PalaceCell({
           : 'none',
       }}
     >
+      {palace.changsheng12 && <span className="text-[9px]" data-testid={`changsheng-${branch}`} style={{color:'var(--t-text2)'}}>长生十二神：{palace.changsheng12}</span>}
       {/* 大限年龄 */}
       {daXianAge && (
         <div className={clsx(

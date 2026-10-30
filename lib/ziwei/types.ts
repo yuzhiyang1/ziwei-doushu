@@ -2,6 +2,12 @@ export interface LocalSchoolConfig {
   brightnessSchool: 'default' | 'XD1' | 'XD2' | 'ZZ';
   leapMonth: 'split' | 'next-month' | 'prev-month' | 'origin-month';
   lateZishi: 'next-day' | 'current-day';
+  gengSihua?: 'default' | 'GYWTY' | 'GYWFT' | 'GYWFX' | 'GYWTX';
+  tianma?: 'year' | 'lunar-month';
+  jiekong?: 'default' | 'single' | 'zhanyan';
+  kuiyue?: 'default' | 'table2' | 'table3' | 'table4';
+  tianshiTianshang?: 'default' | 'iztro-zhongzhou';
+  changsheng?: 'default' | 'water-earth' | 'fire-earth';
 }
 
 export interface BirthInfo {
@@ -67,6 +73,8 @@ export interface SelfSihuaMark {
 }
 
 export interface Palace {
+  /** Optional display of twelve life stages; not an additional natal star. */
+  changsheng12?: string;
   branch: number;      // 0-11 (地支索引)
   stem: number;        // 0-9 (天干索引)
   name: string;        // 宫名

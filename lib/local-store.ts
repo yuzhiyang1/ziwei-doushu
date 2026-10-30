@@ -1,3 +1,4 @@
+import { validateLocalSchoolConfig } from './local-chart';
 import type { BirthInfo, ZiweiChart } from './ziwei/types';
 
 export interface LocalMessage { role: 'user' | 'assistant'; content: string }
@@ -76,15 +77,8 @@ export function validateBirth(value: unknown): BirthInfo {
     result.birthTimeUnknown = b.birthTimeUnknown;
   }
   if (b.schoolConfig !== undefined) {
-    const school = object(b.schoolConfig);
-    if (!['default', 'XD1', 'XD2', 'ZZ'].includes(school.brightnessSchool as string)
-      || !['split', 'next-month', 'prev-month', 'origin-month'].includes(school.leapMonth as string)
-      || !['next-day', 'current-day'].includes(school.lateZishi as string)) throw new Error('排盘口径配置无效');
-    result.schoolConfig = {
-      brightnessSchool: school.brightnessSchool as NonNullable<BirthInfo['schoolConfig']>['brightnessSchool'],
-      leapMonth: school.leapMonth as NonNullable<BirthInfo['schoolConfig']>['leapMonth'],
-      lateZishi: school.lateZishi as NonNullable<BirthInfo['schoolConfig']>['lateZishi'],
-    };
+    try { result.schoolConfig = validateLocalSchoolConfig(b.schoolConfig); }
+    catch { throw new Error('排盘口径配置无效'); }
   }
   for (const key of ['name', 'province', 'city'] as const) if (b[key] !== undefined) result[key] = string(b[key]);
   if (b.longitude !== undefined) {

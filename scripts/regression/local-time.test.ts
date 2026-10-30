@@ -33,3 +33,13 @@ assert.throws(()=>resolveTimeContext(chart,{...defaultTimeSelection(chart),view:
 assert.equal(JSON.stringify(chart),original,'switches never mutate natal chart');
 for(const view of ['mingpan','liushi','daxian','liuyue','liuri','liunian','mingpan'] as TimeView[]) resolveTimeContext(chart,{...defaultTimeSelection(chart),view});
 console.log('local-time: six layers, engine parity, date boundaries, hour boundaries, every decade, repeated switching, immutable natal chart passed');
+
+// Selected school convention must reach decade and annual overlays, not natal stars only.
+const schoolChart = generateChart({year:1990,month:5,day:17,hour:3,gender:'male',schoolConfig:{brightnessSchool:'default',leapMonth:'split',lateZishi:'next-day',gengSihua:'GYWFX'}});
+const schoolAnnual=resolveTimeContext(schoolChart,{...defaultTimeSelection(schoolChart),view:'liunian',date:'2030-07-01'});
+assert.equal(schoolAnnual.overlay['天府'],'科');assert.equal(schoolAnnual.overlay['天相'],'忌');
+const gengDecade=schoolChart.daXians.findIndex(dx=>schoolChart.palaces.find(p=>p.branch===dx.palaceBranch)?.stem===6);
+assert.ok(gengDecade>=0);
+const schoolDecade=resolveTimeContext(schoolChart,{...defaultTimeSelection(schoolChart),view:'daxian',daXianIndex:gengDecade});
+assert.equal(schoolDecade.overlay['天府'],'科');assert.equal(schoolDecade.overlay['天相'],'忌');
+console.log('local-time: selected Geng four-transformations propagated to annual and decade overlays');

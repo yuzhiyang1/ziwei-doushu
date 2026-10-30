@@ -1,5 +1,5 @@
 /** Original, transparent study rules. Not the commercial service's interpretation database. */
-import type { Palace, ZiweiChart } from './ziwei/types';
+import type { LocalSchoolConfig, Palace, ZiweiChart } from './ziwei/types';
 import { BRANCHES } from './ziwei/constants';
 
 export const LOCAL_ANALYSIS_NOTICE = '个人版原创规则摘要，不是官网专业版断语或 AI 结论。紫微斗数为传统文化研究，不能验证人格、预测事件或代替医疗、投资与关系决策。';
@@ -26,8 +26,8 @@ const SYMBOLS: Record<string, string> = {
   七杀: '决断与突破', 破军: '改变与重建',
 };
 export function schoolEvidence(chart: ZiweiChart): string {
-  const c = chart.birthInfo.schoolConfig ?? { brightnessSchool: 'default', leapMonth: 'split', lateZishi: 'next-day' };
-  return `排盘口径：亮度表 ${c.brightnessSchool}；闰月 ${c.leapMonth}；晚子时 ${c.lateZishi}。其余七项（庚年四化、天马、天空、截空旬空、魁钺、天使天伤、长生十二神）沿用引擎固定口径，不支持切换。`;
+  const c: LocalSchoolConfig = chart.birthInfo.schoolConfig ?? { brightnessSchool: 'default', leapMonth: 'split', lateZishi: 'next-day' };
+  return `排盘口径：亮度表 ${c.brightnessSchool}；闰月 ${c.leapMonth}；晚子时 ${c.lateZishi}；庚四化 ${c.gengSihua ?? 'default'}；天马 ${c.tianma ?? 'year'}；截空 ${c.jiekong ?? 'default'}（旬空/副旬不变）；魁钺 ${c.kuiyue ?? 'default'}；天使天伤 ${c.tianshiTianshang ?? 'default'}；长生 ${c.changsheng ?? 'default（不显示）'}。天空沿用固定口径，无独立切换。`;
 }
 export function palaceEvidence(p: Palace): string {
   return `${p.name}（${BRANCHES[p.branch]}）：${p.stars.map(s => `${s.name}${s.brightnessRaw ? `〔${s.brightnessRaw}〕` : ''}${s.siHua ? `化${s.siHua}` : ''}`).join('、') || '无星曜记录'}`;
