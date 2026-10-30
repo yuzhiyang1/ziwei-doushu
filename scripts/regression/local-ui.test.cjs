@@ -100,7 +100,7 @@ async function assertInitialReading(page, name) {
   await skyPage.goto(base+'/chart');await birth(skyPage,'QA天空','1990','8','0');
   await assertInitialReading(skyPage,'desktop');
   const firstSummary=await skyPage.getByTestId('reading-summary').innerText();
-  for(const concept of ['紫微','破军','统筹','重建']) assert.ok(firstSummary.includes(concept),`actual chart explanation includes ${concept}`);
+  for(const concept of ['紫微','破军','先确定方向','再分配责任','拆解与重组','控制','忽略他人的专业与感受']) assert.ok(firstSummary.includes(concept),`actual chart explanation includes ${concept}`);
   assert.match(await skyPage.getByTestId('readable-analysis').locator('.reading-columns').innerText(),/控制|推翻|成本|忽略|过渡/,'specific tension must accompany positive traits');
   await openAdvanced(skyPage);
   const skyBoard=skyPage.locator('.local-workspace .chart-pane');
