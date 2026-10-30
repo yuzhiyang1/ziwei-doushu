@@ -247,6 +247,8 @@ async function assertInitialReading(page, name) {
   await page.screenshot({path:'test-results/chart-desktop.png',fullPage:true});
   assert.equal(await page.locator('.printable-report .report-section').count(),13);
   await page.emulateMedia({media:'print'});
+  // Match A4 portrait's printable area (12 mm margins) before measuring fit.
+  await page.setViewportSize({width:703,height:1032});
   assert.equal(await page.locator('.printable-report').isVisible(),true);
   assert.equal(await page.locator('.local-workspace').isVisible(),false);
   await assertPainted(page.locator('.printable-report').getByTestId('chart-center'),'print center');
@@ -258,9 +260,22 @@ async function assertInitialReading(page, name) {
   }
   assert.match(await printedPalaceLabels.allTextContents().then(xs=>xs.join(' ')),/命宫/);
   for(const cell of await page.locator('.printable-report [data-testid^="palace-cell-"]').all()) await assertPainted(cell,'print palace');
+  const printFit=await page.locator('.printable-report').evaluate(root=>{
+   const report=root.getBoundingClientRect(),chart=root.querySelector('.report-chart').getBoundingClientRect();
+   const cells=[...root.querySelectorAll('[data-testid^=palace-cell-]')].map(el=>{const r=el.getBoundingClientRect();return {top:r.top-chart.top,bottom:r.bottom-chart.top,left:r.left-chart.left,right:r.right-chart.left};});
+   return {chartBottom:chart.bottom-report.top,chartHeight:chart.height,chartWidth:chart.width,cells,breakInside:getComputedStyle(root.querySelector('.report-chart')).breakInside};
+  });
+  assert.ok(printFit.chartBottom<=1032,`complete heading + 12-palace chart must fit first portrait page: ${JSON.stringify(printFit)}`);
+  assert.equal(printFit.breakInside,'avoid');
+  for(const cell of printFit.cells)assert.ok(cell.top>=-1&&cell.bottom<=printFit.chartHeight+1&&cell.left>=-1&&cell.right<=printFit.chartWidth+1,'all palace bounds inside printable chart');
   await page.screenshot({path:'test-results/report-print.png',fullPage:true});
-  await page.pdf({path:'test-results/report.pdf',format:'A4',printBackground:true});
+  const pdf=await page.pdf({path:'test-results/report.pdf',format:'A4',preferCSSPageSize:true,printBackground:true});
+  const mediaBoxes=[...pdf.toString('latin1').matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)];
+  assert.ok(mediaBoxes.length>0,'real PDF page dimensions are inspectable');
+  for(const box of mediaBoxes){assert.ok(Math.abs(Number(box[1])-595.28)<2,'PDF A4 width');assert.ok(Math.abs(Number(box[2])-841.89)<2,'PDF portrait height');}
+  await fs.writeFile('test-results/print-layout.json',JSON.stringify({printFit,pages:mediaBoxes.length,mediaBoxes:mediaBoxes.map(b=>b.slice(1))},null,2));
   await page.emulateMedia({media:'screen'});
+  await page.setViewportSize({width:1365,height:1000});
   await page.getByRole('button',{name:'本命',exact:true}).click();
   await page.getByRole('button',{name:'AI 深问',exact:true}).click();
   const chat=page.getByRole('region',{name:'自带模型问答'});

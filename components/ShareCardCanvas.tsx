@@ -63,6 +63,7 @@ export default function ShareCardCanvas({ chart, birth, highlight }: ShareCardPr
       background: 'linear-gradient(135deg, #fef9eb 0%, #f7e8c4 60%, #efd8a0 100%)',
       padding: '20px 28px',
       fontFamily: '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Microsoft JhengHei", sans-serif',
+      lineHeight: 1.5,
       position: 'relative',
       boxSizing: 'border-box',
       borderRadius: '14px',
@@ -206,23 +207,27 @@ export default function ShareCardCanvas({ chart, birth, highlight }: ShareCardPr
         </div>
 
         {/* 右：关键信息 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
           {/* 命宫主星 */}
           <div>
             <div style={{ fontSize: '10px', color: '#a89b7c', letterSpacing: '0.25em', marginBottom: '2px' }}>命 宫 · {mingBranchName}</div>
             <div style={{
-              fontSize: '52px',
+              fontSize: '48px',
               fontWeight: 800,
               color: '#8b6a14',
               letterSpacing: '0.03em',
-              lineHeight: 1,
-              marginBottom: '12px',
+              lineHeight: 1.5,
+              minHeight: '80px',
+              paddingBottom: '8px',
+              marginBottom: '16px',
+              overflowWrap: 'anywhere',
             }}>{mingStarStr}</div>
 
             {/* 高亮 */}
             {highlight && (
               <div style={{
                 fontSize: '12px',
+                lineHeight: 1.6,
                 color: '#5b4c2e',
                 fontWeight: 500,
                 padding: '8px 10px',
@@ -235,7 +240,7 @@ export default function ShareCardCanvas({ chart, birth, highlight }: ShareCardPr
             )}
           </div>
 
-          {/* 当前大限 + slogan */}
+          {/* 当前大限与本地保存说明（无推广或无效二维码引导）*/}
           <div>
             {dx && (
               <div style={{
@@ -255,13 +260,10 @@ export default function ShareCardCanvas({ chart, birth, highlight }: ShareCardPr
               borderRadius: '6px',
             }}>
               <div style={{ fontSize: '11px', color: '#3d2f10', fontWeight: 600, letterSpacing: '0.08em', lineHeight: 1.4 }}>
-                紫微为门 · 天地人为路
+                传统文化研究 · 不作现实决策依据
               </div>
-              <div style={{ fontSize: '10px', color: '#8b6a14', fontWeight: 600, letterSpacing: '0.08em', lineHeight: 1.4, marginTop: '2px' }}>
-                倪海厦为师 · AI 答疑伴学
-              </div>
-              <div style={{ fontSize: '8px', color: '#a89b7c', letterSpacing: '0.15em', marginTop: '4px' }}>
-                扫码起你的命盘 →
+              <div style={{ fontSize: '9px', color: '#6b5d3f', lineHeight: 1.6, marginTop: '6px' }}>
+                本图片包含出生资料，请妥善保存，分享前确认当事人同意。
               </div>
             </div>
           </div>
