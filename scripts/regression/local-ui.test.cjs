@@ -10,9 +10,12 @@ const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) return; await sleep(100);} throw new Error(label); }
 (async () => {
- const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {}) });
+ const browser = await chromium.launch({ headless: true, chromiumSandbox: true, ...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {}) });
  const context = await browser.newContext({ acceptDownloads:true, viewport:{width:1365,height:1000} });
  const page = await context.newPage(), errors=[], requests=[];
+ await fs.mkdir('test-results', {recursive:true});
+ page.setDefaultTimeout(20000);
+ await page.clock.install({time:new Date('2026-10-30T12:00:00Z')});
  page.on('pageerror',e=>errors.push(e.message)); page.on('request',r=>requests.push(r.url()));
  page.on('dialog', dialog => dialog.accept());
  async function birth(scope,name,year='1990') {
@@ -20,6 +23,8 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   await scope.getByLabel('出生年份',{exact:true}).selectOption(year);
   await scope.getByLabel('出生月份',{exact:true}).selectOption('5');
   await scope.getByLabel('出生日期',{exact:true}).selectOption('9');
+  await scope.getByLabel('出生小时',{exact:true}).selectOption('23');
+  await scope.getByLabel('出生分钟',{exact:true}).selectOption('55');
   await scope.locator('button[type=submit]').click();
  }
  try {
@@ -40,6 +45,10 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   }
   await page.getByLabel('运限公历日期').fill('2024-02-29');
   assert.match(await page.getByTestId('time-context').innerText(),/2024/);
+  await page.getByText('排盘口径（3 项已实现）',{exact:true}).click();
+  await page.getByLabel('星曜亮度表',{exact:true}).selectOption('ZZ');
+  await page.getByLabel('闰月归属',{exact:true}).selectOption('next-month');
+  await page.getByLabel('晚子时排盘日',{exact:true}).selectOption('current-day');
   await page.getByText(/^本地档案与备份/).click();
   await page.getByRole('button',{name:'保存当前命盘',exact:true}).click();
   await eventually(async()=>/（1）/.test(await page.locator('summary').first().innerText()),'archive saved');
@@ -48,9 +57,15 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   const backupDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出备份',exact:true}).click();
   const backup=await backupDownload, backupText=await fs.readFile(await backup.path(),'utf8');
   assert.equal(JSON.parse(backupText).profiles.length,1); assert.ok(!backupText.includes('apiKey'));
+  assert.deepEqual(JSON.parse(backupText).profiles[0].birth.schoolConfig,{brightnessSchool:'ZZ',leapMonth:'next-month',lateZishi:'current-day'});
+  assert.equal(JSON.parse(backupText).profiles[0].birth.day,9);
   await page.reload(); await page.getByText(/^本地档案与备份/).click();
   await page.getByRole('button',{name:/QA甲 ·/}).click();
   await page.getByRole('heading',{name:'十三维本地解读'}).waitFor();
+  await page.getByText('排盘口径（3 项已实现）',{exact:true}).click();
+  assert.equal(await page.getByLabel('星曜亮度表',{exact:true}).inputValue(),'ZZ');
+  assert.equal(await page.getByLabel('闰月归属',{exact:true}).inputValue(),'next-month');
+  assert.equal(await page.getByLabel('晚子时排盘日',{exact:true}).inputValue(),'current-day');
   await page.getByRole('button',{name:'搜索本地相似盘'}).click();
   await page.getByText('QA甲 · 结构重合 100%',{exact:true}).waitFor();
   await page.getByRole('button',{name:'删除QA甲档案'}).click();
@@ -58,11 +73,21 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   await page.getByLabel('导入备份',{exact:false}).setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(backupText)});
   await page.getByText('备份恢复成功',{exact:true}).waitFor();
   await page.getByLabel('导入备份',{exact:false}).setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('{"format":"bad"}')});
+  await page.locator('details').filter({has:page.getByText(/^本地档案与备份/)}).getByRole('status').filter({hasText:/格式|版本|不支持|无效/}).waitFor();
   assert.match(await page.locator('summary').first().innerText(),/（1）/);
   const reportDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出文本报告'}).click();
   assert.ok((await fs.readFile(await (await reportDownload).path(),'utf8')).length>1000);
   const pngDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出本命 PNG'}).click();
   const png=await fs.readFile(await (await pngDownload).path()); assert.equal(png.subarray(1,4).toString(),'PNG'); assert.ok(png.length>10000);
+  await page.screenshot({path:'test-results/chart-desktop.png',fullPage:true});
+  assert.equal(await page.locator('.printable-report .report-section').count(),13);
+  await page.emulateMedia({media:'print'});
+  assert.equal(await page.locator('.printable-report').isVisible(),true);
+  assert.equal(await page.locator('.local-workspace').isVisible(),false);
+  await page.screenshot({path:'test-results/report-print.png',fullPage:true});
+  await page.pdf({path:'test-results/report.pdf',format:'A4',printBackground:true});
+  await page.emulateMedia({media:'screen'});
+  await page.getByRole('button',{name:'本命',exact:true}).click();
   const chat=page.getByRole('region',{name:'自带模型问答'});
   await chat.getByText('模型连接设置',{exact:true}).click();
   await chat.getByLabel('API 地址',{exact:true}).fill('https://qa.invalid/v1/chat/completions');
@@ -78,23 +103,46 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   await page.route('https://qa.invalid/**',async route=>{await sleep(1500);await route.fulfill({status:503,body:'unavailable'}).catch(()=>{});});
   await chat.getByLabel('问答问题').fill('测试取消'); await chat.getByRole('button',{name:'发送问题'}).click();
   await chat.getByRole('button',{name:'取消请求'}).click(); await chat.getByText(/请求已取消/).waitFor();
-  await page.reload(); await page.getByText(/^本地档案与备份/).click(); await page.getByRole('button',{name:/QA甲 ·/}).click();
+  await page.reload(); await page.getByText(/^本地档案与备份/).click();
+  await page.clock.setFixedTime(new Date('2027-10-30T12:00:00Z'));
+  await page.getByRole('button',{name:/QA甲 ·/}).click();
   await page.getByText('模型连接设置',{exact:true}).click(); assert.equal(await page.getByLabel('API Key',{exact:true}).inputValue(),'');
   await page.getByText(/MOCK RESPONSE/).waitFor();
   await context.setOffline(true);
   await page.getByRole('button',{name:'流年',exact:true}).click();
   await page.getByRole('button',{name:'搜索本地相似盘'}).click(); await page.getByText('QA甲 · 结构重合 100%',{exact:true}).waitFor();
   await context.setOffline(false);
+  await page.clock.setFixedTime(new Date('2026-10-30T12:00:00Z'));
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'test-results/chart-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1365,height:1000});
   await page.goto(base+'/heming');
   const parties=page.locator('section').filter({has:page.getByRole('heading',{name:'甲方',exact:true})});
   await birth(parties,'甲');
   await birth(page.locator('section').filter({has:page.getByRole('heading',{name:'乙方',exact:true})}),'乙','1991');
   await page.getByRole('heading',{name:'十二宫结构对照'}).waitFor(); assert.equal(await page.locator('tbody tr').count(),12);
+  await parties.getByText('排盘口径（3 项已实现）',{exact:true}).click();
+  await parties.getByLabel('星曜亮度表',{exact:true}).selectOption('XD1');
+  const second=page.locator('section').filter({has:page.getByRole('heading',{name:'乙方',exact:true})});
+  await second.getByText('排盘口径（3 项已实现）',{exact:true}).click();
+  assert.equal(await second.getByLabel('星曜亮度表',{exact:true}).inputValue(),'default');
+  await page.getByRole('button',{name:'展开双方命盘'}).click();
+  await page.getByRole('button',{name:'收起双方命盘'}).click();
+  await page.getByRole('button',{name:'展开双方命盘'}).click();
+  await page.getByRole('button',{name:'收起双方命盘'}).click();
+  const pairAI=page.getByRole('button',{name:'开启自带模型合盘问答'});
+  assert.equal(await pairAI.isDisabled(),true);
+  await page.getByRole('region',{name:'合盘结果'}).locator('input[type=checkbox]').check();
+  await pairAI.click();
+  await page.getByRole('region',{name:'自带模型问答'}).waitFor();
+  await page.getByRole('region',{name:'合盘结果'}).locator('input[type=checkbox]').first().uncheck();
+  assert.equal(await page.getByRole('region',{name:'自带模型问答'}).count(),0);
+  await page.screenshot({path:'test-results/pair.png',fullPage:true});
   await page.getByRole('button',{name:'编辑并重新排盘'}).first().click();
   assert.equal(await page.getByRole('heading',{name:'十二宫结构对照'}).count(),0);
   await page.getByRole('button',{name:'取消编辑，保留原盘'}).click(); await page.getByRole('heading',{name:'十二宫结构对照'}).waitFor();
   for(const path of ['/study','/library','/library/search?q=紫微']) { await page.goto(base+path); assert.ok((await page.locator('body').innerText()).length>100); }
   assert.equal(errors.length,0,errors.join('\n')); assert.ok(!requests.some(url=>/\/api\/(interpret|heming)/.test(url)));
   console.log('PASS: browser local flows; AI response mocked; offline in-session only, not offline server restart.');
- } finally { await browser.close(); }
+ } catch(error) { await page.screenshot({path:'test-results/failure.png',fullPage:true}).catch(()=>{}); await fs.writeFile('test-results/failure.txt',String(error)+'\n'+await page.locator('body').innerText().catch(()=>'')); throw error; } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

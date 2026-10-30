@@ -8,8 +8,8 @@ on:
 
 jobs:
   check:
-    name: 类型检查 + 排盘回归
-    runs-on: ubuntu-latest
+    name: 类型检查 + 回归 + 浏览器验收
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -32,3 +32,25 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+
+      - name: 安装浏览器（保留 Chromium sandbox）
+        run: npx playwright install --with-deps chromium
+
+      - name: 浏览器本地流程验收（AI mocked）
+        run: |
+          python3 -m http.server 3000 --bind 127.0.0.1 --directory out > /tmp/ziwei-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000/ > /dev/null && break; sleep 1; done
+          npm run test:ui
+        env:
+          BASE_URL: http://127.0.0.1:3000
+
+      - name: 保留浏览器验收截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-ui-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

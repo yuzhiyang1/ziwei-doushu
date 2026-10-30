@@ -10,3 +10,6 @@ node_modules
 
 # Static personal build output
 out/
+
+# Browser test screenshots
+test-results/
