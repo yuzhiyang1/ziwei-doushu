@@ -93,6 +93,40 @@ async function assertInitialReading(page, name) {
   await scope.locator('button[type=submit]').click();
  }
  try {
+  // Restore each persisted theme before document scripts run. Fresh light-only sessions miss #418.
+  for(const savedTheme of ['dark','light']) {
+   const themeContext=await browser.newContext({viewport:{width:1365,height:1000},storageState:{cookies:[],origins:[{origin:new URL(base).origin,localStorage:[{name:'ziwei-theme',value:savedTheme}]}]}});
+   const themePage=await themeContext.newPage(),themeErrors=[];
+   themePage.on('pageerror',error=>themeErrors.push('pageerror: '+error.message));
+   themePage.on('console',message=>{if(message.type()==='error' && /hydrat|server rendered|server-rendered|did not match|React error #(?:418|423|425)/i.test(message.text()))themeErrors.push('console: '+message.text());});
+   const assertTheme=async expected=>{
+    await eventually(async()=>await themePage.locator('html').getAttribute('data-theme')===expected && await themePage.getByRole('button',{name:'切换明暗主题'}).innerText()===(expected==='dark'?'浅色':'深色'),'restored theme and switch agree');
+    assert.equal(await themePage.evaluate(()=>localStorage.getItem('ziwei-theme')),expected);
+    await themePage.waitForTimeout(200); // collect recoverable hydration console errors, not only final DOM state
+    assert.deepEqual(themeErrors,[],themeErrors.join('\n'));
+   };
+   try {
+    await themePage.goto(base+'/chart');await assertTheme(savedTheme);
+    await themePage.reload();await assertTheme(savedTheme);
+    await birth(themePage,'主题恢复验收','1990','8','0');
+    await assertReading(themePage.getByRole('region',{name:'本地十三维解读'}));
+    assert.equal(await themePage.getByLabel('API Key',{exact:true}).inputValue(),'','theme restoration does not invent or restore a model credential');
+    await themePage.screenshot({path:`test-results/theme-${savedTheme}-reading.png`,fullPage:false});
+    await themePage.getByRole('button',{name:'AI 深问',exact:true}).click();
+    await themePage.getByLabel('API Key',{exact:true}).fill('QA-THEME-MEMORY-ONLY');
+    await themePage.getByRole('button',{name:'切换明暗主题'}).click();
+    const opposite=savedTheme==='dark'?'light':'dark';await assertTheme(opposite);
+    assert.equal(await themePage.getByLabel('API Key',{exact:true}).inputValue(),'QA-THEME-MEMORY-ONLY','theme toggle does not remount and discard in-memory form input');
+    await themePage.reload();await assertTheme(opposite);
+    await birth(themePage,'主题刷新验收','1990','8','0');
+    await assertReading(themePage.getByRole('region',{name:'本地十三维解读'}));
+    assert.equal(await themePage.getByLabel('API Key',{exact:true}).inputValue(),'','reload intentionally clears ephemeral credentials');
+    assert.deepEqual(themeErrors,[],themeErrors.join('\n'));
+   } catch(error) {
+    await themePage.screenshot({path:`test-results/theme-${savedTheme}-failure.png`,fullPage:true}).catch(()=>{});
+    await fs.writeFile(`test-results/theme-${savedTheme}-errors.json`,JSON.stringify({errors:themeErrors,failure:String(error)},null,2));throw error;
+   } finally {await themeContext.close();}
+  }
   await page.goto(base+'/chart');
   // Independent non-子 chart: 1990 午年 branch 6, 08:00 辰时 index 4.
   // Default 天空=(6+1)%12=7; public year-hour rule=(6+1+4)%12=11.
