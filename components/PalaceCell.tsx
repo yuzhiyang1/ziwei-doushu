@@ -66,7 +66,8 @@ export default function PalaceCell({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
+      data-testid={`palace-cell-${branch}`}
+      initial={false}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35, delay, ease: 'easeOut' }}
       onClick={onClick}

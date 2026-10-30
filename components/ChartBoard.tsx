@@ -90,7 +90,8 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
 
       {/* 命盘标题 */}
       <motion.div
-        initial={{ opacity: 0, y: -8 }}
+        data-testid="chart-title"
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-3"
       >
@@ -142,7 +143,8 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
 
         {/* 中央信息区 */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          data-testid="chart-center"
+          initial={false}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
           className="flex flex-col items-center justify-center p-4 gap-3"
@@ -184,7 +186,7 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
           {sanFangBranches !== null && (
             <motion.div
               key={`sf-${selectedBranch}`}
-              initial={{ opacity: 0 }}
+              initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
@@ -258,7 +260,7 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
 
       {/* 图例 */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={false}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.7 }}
         className="mt-3 flex items-center justify-center gap-2 text-[9px] flex-wrap"

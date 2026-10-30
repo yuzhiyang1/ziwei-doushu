@@ -426,7 +426,7 @@ body {
 /* ─── 打印样式 ───────────────────────────────────────────── */
 @media print {
   .no-print { display: none !important; }
-  body { background: white; color: #1a1a18; }
+  html, body { background: white!important; color: #1a1a18; }
   @page { margin: 1.2cm; size: A4 landscape; }
 }
 
@@ -460,5 +460,5 @@ body {
  .printable-report h1 { font-size:22pt; margin:12pt 0; }
  .printable-report h2 { font-size:16pt; margin:12pt 0; }
  .printable-report .report-section { break-inside:avoid; margin:18pt 0; }
- .printable-report * { color:#111!important; animation:none!important; transform:none!important; opacity:1!important; }
+ .printable-report * { background-color:white!important; background-image:none!important; border-color:#bbb!important; color:#111!important; animation:none!important; transform:none!important; opacity:1!important; }
 }

@@ -9,6 +9,35 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) return; await sleep(100);} throw new Error(label); }
+async function assertPainted(locator, description, minOpacity = 0.9) {
+ const state = await locator.evaluate(element => {
+  let opacity=1, visible=true;
+  for(let node=element;node;node=node.parentElement) {
+   const style=getComputedStyle(node);
+   opacity *= Number(style.opacity);
+   if(style.display==='none' || style.visibility==='hidden' || style.visibility==='collapse') visible=false;
+  }
+  const rect=element.getBoundingClientRect();
+  return {opacity,visible,width:rect.width,height:rect.height,text:element.textContent};
+ });
+ assert.ok(state.visible && state.opacity>=minOpacity && state.width>0 && state.height>0,
+  `${description} must actually paint, not merely exist: ${JSON.stringify(state)}`);
+}
+async function assertChartPainted(page, description) {
+ const board=page.locator('.local-workspace .local-chart-grid');
+ const cells=board.locator('[data-testid^="palace-cell-"]');
+ assert.equal(await cells.count(),12,`${description}: all 12 palaces exist`);
+ for(const cell of await cells.all()) await assertPainted(cell,description+' palace cell');
+ await assertPainted(board.getByTestId('chart-title'),description+' title');
+ await assertPainted(board.getByTestId('chart-center'),description+' center');
+ const major=cells.getByText('紫微',{exact:true});
+ assert.equal(await major.count(),1,`${description}: major star 紫微 exists exactly once`);
+ await major.scrollIntoViewIfNeeded();
+ await assertPainted(major,description+' major star',0.5);
+ const inViewport=await major.evaluate(el=>{const r=el.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<innerWidth;});
+ assert.ok(inViewport,`${description}: visible major star intersects viewport after scroll`);
+}
+
 (async () => {
  const browser = await chromium.launch({ headless: true, chromiumSandbox: true, ...(process.env.CHROMIUM_PATH ? {executablePath:process.env.CHROMIUM_PATH} : {}) });
  const context = await browser.newContext({ acceptDownloads:true, viewport:{width:1365,height:1000} });
@@ -79,11 +108,14 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   assert.ok((await fs.readFile(await (await reportDownload).path(),'utf8')).length>1000);
   const pngDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出本命 PNG'}).click();
   const png=await fs.readFile(await (await pngDownload).path()); assert.equal(png.subarray(1,4).toString(),'PNG'); assert.ok(png.length>10000);
+  await assertChartPainted(page,'desktop');
   await page.screenshot({path:'test-results/chart-desktop.png',fullPage:true});
   assert.equal(await page.locator('.printable-report .report-section').count(),13);
   await page.emulateMedia({media:'print'});
   assert.equal(await page.locator('.printable-report').isVisible(),true);
   assert.equal(await page.locator('.local-workspace').isVisible(),false);
+  await assertPainted(page.locator('.printable-report').getByTestId('chart-center'),'print center');
+  for(const cell of await page.locator('.printable-report [data-testid^="palace-cell-"]').all()) await assertPainted(cell,'print palace');
   await page.screenshot({path:'test-results/report-print.png',fullPage:true});
   await page.pdf({path:'test-results/report.pdf',format:'A4',printBackground:true});
   await page.emulateMedia({media:'screen'});
@@ -114,6 +146,7 @@ async function eventually(fn, label) { for(let i=0;i<50;i++){if(await fn()) retu
   await context.setOffline(false);
   await page.clock.setFixedTime(new Date('2026-10-30T12:00:00Z'));
   await page.setViewportSize({width:390,height:844});
+  await assertChartPainted(page,'mobile');
   await page.screenshot({path:'test-results/chart-mobile.png',fullPage:true});
   await page.setViewportSize({width:1365,height:1000});
   await page.goto(base+'/heming');
