@@ -34,7 +34,7 @@ function SearchContent() {
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <div className="text-center mb-10"><label>搜索原典 <input aria-label="搜索原典" value={q} onChange={e=>{setQ(e.target.value);router.replace('/library/search?q='+encodeURIComponent(e.target.value),{scroll:false});}} style={{color:"var(--tx-0)",background:"var(--bg-card)",padding:12}} /></label>
+        <div className="text-center mb-10"><label>搜索摘编 <input aria-label="搜索摘编" value={q} onChange={e=>{setQ(e.target.value);router.replace('/library/search?q='+encodeURIComponent(e.target.value),{scroll:false});}} style={{color:"var(--tx-0)",background:"var(--bg-card)",padding:12}} /></label>
           <div style={{ fontSize: '13px', color: 'var(--tx-3)', letterSpacing: '0.15em', marginBottom: '4px' }}>
             搜索关键词
           </div>
@@ -42,7 +42,7 @@ function SearchContent() {
             「{q || '（空）'}」
           </h1>
           <div style={{ fontSize: '12px', color: 'var(--tx-3)', marginTop: '8px' }}>
-            共找到 <strong style={{ color: 'var(--ac)' }}>{hits.length}</strong> 条古籍原文匹配
+            共找到 <strong style={{ color: 'var(--ac)' }}>{hits.length}</strong> 条整理摘编匹配
           </div>
         </div>
 

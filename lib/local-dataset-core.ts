@@ -8,7 +8,8 @@ export const MAX_DATASET_FILE = 2 * 1024 * 1024 * 1024;
 export const MAX_DATASET_LINE = 2 * 1024 * 1024;
 export interface DatasetProgress { phase: 'reading' | 'indexing' | 'searching' | 'report'; bytes: number; totalBytes: number; rows: number }
 export interface DatasetYear { year: number; count: number; importedAt: number; source: string; fileName: string; version: string }
-export interface DatasetMatch { birth: BirthInfo; score: number; source: string; key: string; sourceMingStar: string | null }
+export type DatasetMatchScope = 'all' | 'same-year' | 'cross-year';
+export interface DatasetMatch { shared: string[]; group: 'same-year' | 'cross-year'; birth: BirthInfo; score: number; source: string; key: string; sourceMingStar: string | null }
 export interface DatasetReport { key: string; birth: BirthInfo; content: string; source: string; dimensions: Record<string, string>; generatedAt?: string }
 interface DatasetRow { key: string; birth: BirthInfo; sourceMingStar: string | null; dimensions: Record<string, string> }
 interface DatasetRecord { version: string; key: string; birth: BirthInfo; signature: string[]; sourceMingStar: string | null }
@@ -183,7 +184,8 @@ export async function importDatasetFileCore(file: DatasetFile, signal?: AbortSig
     return await listDatasetYearsCore();
   } finally { if (!committed) await deleteVersion(db, version).catch(() => {}); db.close(); }
 }
-export async function findDatasetMatchesCore(chart: ZiweiChart, limit = 20, signal?: AbortSignal, progress?: DatasetProgressCallback): Promise<DatasetMatch[]> {
+export async function findDatasetMatchesCore(chart: ZiweiChart, limit = 20, signal?: AbortSignal, progress?: DatasetProgressCallback, scope: DatasetMatchScope = 'all'): Promise<DatasetMatch[]> {
+  if (!['all', 'same-year', 'cross-year'].includes(scope)) throw new Error('匹配年份范围无效');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('匹配数量应为 1–100');
   const defaultChart = generateLocalChart({ ...chart.birthInfo, schoolConfig: { ...LOCAL_SCHOOL_DEFAULTS } }, { ...LOCAL_SCHOOL_DEFAULTS });
   const signature = chartSignature(defaultChart), db = await openDB(); let rows = 0;
@@ -197,9 +199,10 @@ export async function findDatasetMatchesCore(chart: ZiweiChart, limit = 20, sign
         req.onsuccess = () => {
           const cursor = req.result; if (!cursor) return;
           const row = cursor.value as DatasetRecord;
-          if (active.has(row.version)) {
+          const group = row.birth.year === defaultChart.birthInfo.year ? 'same-year' : 'cross-year';
+          if (active.has(row.version) && (scope === 'all' || scope === group)) {
             const score = signatureScore(signature, row.signature);
-            best.push({ birth: row.birth, key: row.key, score, source: DATASET_SOURCE, sourceMingStar: row.sourceMingStar });
+            best.push({ group, shared: signature.filter(key => row.signature.includes(key)), birth: row.birth, key: row.key, score, source: DATASET_SOURCE, sourceMingStar: row.sourceMingStar });
             best.sort((a, b) => b.score - a.score || a.key.localeCompare(b.key)); if (best.length > limit) best.pop();
             rows++; if (rows % 100 === 0) progress?.({ phase: 'searching', bytes: 0, totalBytes: 0, rows });
           }

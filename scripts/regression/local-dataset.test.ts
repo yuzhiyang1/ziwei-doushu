@@ -82,6 +82,17 @@ async function main() {
   await assert.rejects(importDatasetFileCore(oversized), /2 GB/);
   const lines = []; for await (const line of datasetLines(fixture(JSON.stringify(row()) + '\n\n' + JSON.stringify(row(1)), 1))) lines.push(line);
   assert.equal(lines.length, 2, 'UTF-8 split boundaries and blank lines work');
+  await importDatasetFileCore(fixtureRows([row(0,1991),row(1,1991)]));
+  const same = await findDatasetMatchesCore(chart,20,undefined,undefined,'same-year');
+  const cross = await findDatasetMatchesCore(chart,20,undefined,undefined,'cross-year');
+  assert.equal(same.length,2); assert.equal(cross.length,2);
+  assert.ok(same.every(r=>r.birth.year===1990&&r.group==='same-year'));
+  assert.ok(cross.every(r=>r.birth.year===1991&&r.group==='cross-year'));
+  assert.equal(same[0].shared.length,14);
+  assert.equal((await findDatasetMatchesCore(chart,1,undefined,undefined,'cross-year')).length,1);
+  await assert.rejects(findDatasetMatchesCore(chart,20,undefined,undefined,'invalid' as never),/范围/);
+  await deleteDatasetYearCore(1991);
+  assert.equal((await findDatasetMatchesCore(chart,20,undefined,undefined,'cross-year')).length,0);
   await deleteDatasetYearCore(1990); assert.equal((await listDatasetYearsCore()).length, 0); assert.equal((await findDatasetMatchesCore(chart)).length, 0);
   console.log('PASS dataset streaming UTF-8, validation, indexing, exact report, cancellation, replacement atomicity, limits and deletion (synthetic + fake IndexedDB)');
 }

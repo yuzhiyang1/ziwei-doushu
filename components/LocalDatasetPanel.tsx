@@ -4,7 +4,7 @@ import type { BirthInfo, ZiweiChart } from '@/lib/ziwei/types';
 import { BRANCHES } from '@/lib/ziwei/constants';
 import manifest from '@/lib/dataset-manifest.json';
 import { generateLocalChart, LOCAL_SCHOOL_DEFAULTS } from '@/lib/local-chart';
-import { deleteDatasetYear, findDatasetMatches, importDatasetFile, listDatasetYears, readDatasetReport, type DatasetMatch, type DatasetProgress, type DatasetReport, type DatasetYear } from '@/lib/local-dataset';
+import { deleteDatasetYear, findDatasetMatches, importDatasetFile, listDatasetYears, readDatasetReport, type DatasetMatch, type DatasetMatchScope, type DatasetProgress, type DatasetReport, type DatasetYear } from '@/lib/local-dataset';
 
 const RELEASE='https://github.com/Renhuai123/ziwei-doushu/releases/tag/v4.0-13d';
 const ASSETS='https://github.com/Renhuai123/ziwei-doushu/releases/download/v4.0-13d';
@@ -13,6 +13,7 @@ function birthLabel(b:BirthInfo) { return `${b.year}-${String(b.month).padStart(
 function expectedYearRows(year:number){return (new Date(Date.UTC(year,1,29)).getUTCMonth()===1?366:365)*24;}
 function megabytes(bytes:number) { return (bytes/1024/1024).toFixed(1); }
 export default function LocalDatasetPanel({chart,onLoad}:{chart?:ZiweiChart|null;onLoad?:(birth:BirthInfo)=>void}) {
+ const [matchScope,setMatchScope]=useState<DatasetMatchScope>('all');
  const [years,setYears]=useState<DatasetYear[]>([]),[downloadYear,setDownloadYear]=useState(1990);
  const [matches,setMatches]=useState<DatasetMatch[]>([]),[report,setReport]=useState<DatasetReport|null>(null);
  const [progress,setProgress]=useState<DatasetProgress|null>(null),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[cancellable,setCancellable]=useState(true);
@@ -61,8 +62,9 @@ zstd -d --long=27 year-${downloadYear}.jsonl.zst`}</pre><p>先比较校验值，
    <p>当前显示命盘 / 精确报告查找键：{birthLabel(chart.birthInfo)}。</p><p>按数据集口径重排后匹配：{matchBirth?birthLabel(matchBirth):'—'}。这不是直接匹配当前自定义盘；先将原始出生输入按默认流派重新排盘（晚子时换日），再与索引对照。匹配分数以“宫名:主星名”集合的 Jaccard 重合度 ×100 计算；不是官方匹配评分，也不是人生相似率、人格概率或预测结论。</p>
    {chart.birthInfo.birthTimeUnknown && <p role="alert">时辰未知：不进行精确报告查询或公开样本匹配，请先确定时辰。</p>}
    <p>公开报告按上方“精确报告查找键”读取文件，属于用户当前排盘日所选键，不保证与默认重排匹配盘同口径。尤其晚子时、闰月、自选流派不同，请核对两行日期后使用。</p>
-   <button type="button" disabled={busy||!canQuery||!years.length} onClick={()=>run(async(signal,onProgress)=>{setMatches([]);const result=await findDatasetMatches(chart,20,signal,onProgress);if(!signal.aborted&&mounted.current)setMatches(result);return result.length?`已匹配 ${result.length} 条；仅搜索已导入年份。`:'已导入样本中没有匹配结果。';})}>匹配已导入样本</button>
-   <ol>{matches.map(m=><li key={m.key}><details><summary>{birthLabel(m.birth)} · 结构得分 {m.score}%</summary><p>数据来源：{m.source}；记录键：{m.key}</p>{onLoad && <button type="button" disabled={busy} onClick={()=>{setMatches([]);setReport(null);onLoad(m.birth);}}>载入此样本命盘</button>}</details></li>)}</ol>
+   <label>公开样本年份范围 <select aria-label="公开样本年份范围" disabled={busy} value={matchScope} onChange={e=>{setMatchScope(e.target.value as DatasetMatchScope);setMatches([]);setStatus('');}}><option value="all">全部已导入年份</option><option value="same-year">同公历排盘年</option><option value="cross-year">跨公历排盘年</option></select></label><p>分组依据默认重排后的公历年份，不按年柱/生肖；每次仅列所选范围最高20条，分数相同时按出生键排序。100%只表示宫名与主星集合一致，不表示全盘完全相同或相同人生。</p>
+   <button type="button" disabled={busy||!canQuery||!years.length} onClick={()=>run(async(signal,onProgress)=>{setMatches([]);const result=await findDatasetMatches(chart,20,signal,onProgress,matchScope);if(!signal.aborted&&mounted.current)setMatches(result);return result.length?`已匹配 ${result.length} 条；仅搜索已导入年份。`:'已导入样本中没有匹配结果。';})}>匹配已导入样本</button>
+   <ol>{matches.map(m=><li key={m.key}><details><summary>{birthLabel(m.birth)} · 结构得分 {m.score}%</summary><p>{m.group==='same-year'?'同公历排盘年':'跨公历排盘年'}；共同宫位主星：{m.shared.join('、')||'无'}。</p><p>数据来源：{m.source}；记录键：{m.key}</p>{onLoad && <button type="button" disabled={busy} onClick={()=>{setMatches([]);setReport(null);onLoad(m.birth);}}>载入此样本命盘</button>}</details></li>)}</ol>
    <h3>3. 读取当前盘公开十三维原文</h3>
    <p>再次选择对应年份的原始 JSONL，逐行查找精确日期、时辰、性别记录。无需先建索引；不使用模糊结果冒充当前命盘报告。不存储报告全文，刷新后需重新读取。</p>
    {!inRange && <p role="alert">当前排盘年超出公开 v4 的 1950–2026 范围，无对应原文。</p>}

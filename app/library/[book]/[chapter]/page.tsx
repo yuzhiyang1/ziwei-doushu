@@ -5,6 +5,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ALL_BOOKS, getChapter } from '@/lib/classics';
+import StudyNoteEditor from '@/components/StudyNoteEditor';
+import ResearchAI from '@/components/ResearchAI';
 
 export async function generateStaticParams() {
   return ALL_BOOKS.flatMap(b =>
@@ -18,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ book: str
   if (!result) return {};
   return {
     title: `${result.chapter.title} · 《${result.book.title}》· 紫微斗数古籍`,
-    description: result.chapter.subtitle || `《${result.book.title}》${result.chapter.title}原文`,
+    description: result.chapter.subtitle || `《${result.book.title}》${result.chapter.title}摘编文本`,
   };
 }
 
@@ -62,6 +64,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ book: 
           )}
         </div>
 
+        <p>本页为仓库整理摘编，含现代转述，待校勘；非完整古籍原文。历史论说不构成事实预测、医疗或决策建议。下方个人笔记不属于原著或倪师批注。</p>
         {/* 段落 */}
         <div style={{ background: 'var(--bg-card)', borderRadius: '14px', border: '1px solid rgba(184,146,42,0.2)', padding: '32px 28px' }}>
           {chapter.paragraphs.map((p, i) => (
@@ -100,6 +103,8 @@ export default async function ChapterPage({ params }: { params: Promise<{ book: 
                   {p.text}
                 </p>
               </div>
+              <Link href={`/study?q=${encodeURIComponent(p.text.slice(0,4))}`}>按开头关键词查公开课程引文（非自动证实关联）</Link>
+              <StudyNoteEditor id={`classic:${p.id}`}/>
               {p.translation && (
                 <div style={{
                   marginTop: '8px',
@@ -126,7 +131,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ book: 
                   color: 'var(--tx-2)',
                   lineHeight: 1.8,
                 }}>
-                  <span style={{ fontSize: '10px', color: 'var(--ji)', marginRight: '6px' }}>倪师注</span>
+                  <span style={{ fontSize: '10px', color: 'var(--ji)', marginRight: '6px' }}>有来源的课程引文</span>
                   {p.niNote}
                 </div>
               )}
@@ -172,6 +177,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ book: 
             </Link>
           ) : <div style={{ flex: 1 }} />}
         </div>
+        <ResearchAI title="本章模型辅助研读（非原文/倪师批注）" context={{kind:"仓库整理摘编，含现代转述，待校勘；不保证古籍原文",book:book.title,chapter:chapter.title,paragraphs:chapter.paragraphs.map(p=>({id:p.id,text:p.text}))}}/>
       </article>
     </div>
   );

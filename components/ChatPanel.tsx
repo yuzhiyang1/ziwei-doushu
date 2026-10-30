@@ -62,8 +62,8 @@ export default function ChatPanel({ chart, context, historyKey }: { chart: Ziwei
     <p className="text-xs my-2">独立学习助手，不是官网专业版 AI。仅使用你自己的 API Key 和兼容 OpenAI Chat Completions 的模型服务，不调用原站会员接口、不提供平台额度。模型服务可能收费。API Key 仅在本页面内存中，刷新后清除，不写入备份。浏览器直连受 CORS 限制。本版所有服务（含本机）都要求自带 Key；本机服务也须自行设置访问令牌。</p>
     <section aria-label="模型连接设置"><h3>模型连接设置</h3><div className="grid gap-2 my-3">
       <label>API 地址（Base URL 或完整接口） <input aria-label="API 地址" className="w-full" value={endpoint} disabled={loading} onChange={e => { setEndpoint(e.target.value); setConsent(false); }} /></label>
-      <label>模型名称 <input aria-label="模型名称" value={model} disabled={loading} onChange={e => setModel(e.target.value)} placeholder="填写服务提供的模型 ID" /></label>
-      <label>API Key <input aria-label="API Key" type="password" autoComplete="off" value={apiKey} disabled={loading} onChange={e => setApiKey(e.target.value)} /></label>
+      <label>模型名称 <input aria-label="模型名称" value={model} disabled={loading} onChange={e => { setModel(e.target.value); setConsent(false); }} placeholder="填写服务提供的模型 ID" /></label>
+      <label>API Key <input aria-label="API Key" type="password" autoComplete="off" value={apiKey} disabled={loading} onChange={e => { setApiKey(e.target.value); setConsent(false); }} /></label>
     </div>
       <p className="text-xs">可填 https://你的服务地址、以 /v1 结尾的 Base URL，或完整 /chat/completions 地址。自动补齐后发送到：{resolvedEndpoint || '请填写有效地址'}</p>
       {!apiKey.trim() && <p role="note" className="text-sm my-2">尚未配置 API Key。请在上方填写自己的 Key 和模型名称后再发送；本地排盘不需要 Key。</p>}

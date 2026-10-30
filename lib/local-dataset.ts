@@ -1,8 +1,8 @@
 import type { BirthInfo, ZiweiChart } from './ziwei/types';
 import { deleteDatasetYearCore, listDatasetYearsCore } from './local-dataset-core';
-import type { DatasetMatch, DatasetProgressCallback, DatasetReport, DatasetYear } from './local-dataset-core';
+import type { DatasetMatch, DatasetMatchScope, DatasetProgressCallback, DatasetReport, DatasetYear } from './local-dataset-core';
 export { DATASET_SOURCE, MAX_DATASET_FILE, MAX_DATASET_LINE } from './local-dataset-core';
-export type { DatasetProgress, DatasetYear, DatasetMatch, DatasetReport } from './local-dataset-core';
+export type { DatasetProgress, DatasetYear, DatasetMatch, DatasetMatchScope, DatasetReport } from './local-dataset-core';
 
 function runWorker<T>(operation: 'import' | 'match' | 'report', payload: Record<string, unknown>, signal?: AbortSignal, onProgress?: DatasetProgressCallback): Promise<T> {
   if (signal?.aborted) return Promise.reject(new DOMException('操作已取消', 'AbortError'));
@@ -28,5 +28,5 @@ function runWorker<T>(operation: 'import' | 'match' | 'report', payload: Record<
 export function importDatasetFile(file: File, signal?: AbortSignal, onProgress?: DatasetProgressCallback): Promise<DatasetYear[]> { return runWorker('import', { file }, signal, onProgress); }
 export const listDatasetYears = listDatasetYearsCore;
 export const deleteDatasetYear = deleteDatasetYearCore;
-export function findDatasetMatches(chart: ZiweiChart, limit = 20, signal?: AbortSignal, onProgress?: DatasetProgressCallback): Promise<DatasetMatch[]> { return runWorker('match', { chart, limit }, signal, onProgress); }
+export function findDatasetMatches(chart: ZiweiChart, limit = 20, signal?: AbortSignal, onProgress?: DatasetProgressCallback, scope: DatasetMatchScope = 'all'): Promise<DatasetMatch[]> { return runWorker('match', { chart, limit, scope }, signal, onProgress); }
 export function readDatasetReport(file: File, birth: BirthInfo, signal?: AbortSignal, onProgress?: DatasetProgressCallback): Promise<DatasetReport> { return runWorker('report', { file, birth }, signal, onProgress); }

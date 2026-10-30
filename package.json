@@ -7,13 +7,13 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx scripts/regression/pan-integrity.test.ts && node --import tsx scripts/regression/dst-cn.test.ts && node --import tsx scripts/regression/clock-adjust.test.ts && node --import tsx scripts/regression/sizhu-lichun-boundary.test.ts && node --import tsx scripts/regression/hongluan-tianxi.test.ts && node --import tsx scripts/regression/famous-hour-consistency.test.ts && node --import tsx scripts/regression/iztro-time-index-boundary.test.ts && node --import tsx scripts/regression/solar-date-exists.test.ts && node --import tsx scripts/regression/natal-dual-sihua-same-palace.test.ts && node --import tsx scripts/regression/neutral-naming.test.ts && node --import tsx scripts/regression/local-time.test.ts && node --import tsx scripts/regression/local-analysis.test.ts && node --import tsx scripts/regression/local-storage-ai.test.ts && node --import tsx scripts/regression/local-birth.test.ts && node --import tsx scripts/regression/local-idb.test.ts && node --import tsx scripts/regression/local-school.test.ts && node --import tsx scripts/regression/local-similarity.test.ts && node --import tsx scripts/regression/local-dataset.test.ts && node scripts/regression/local-dataset-worker.test.cjs && node --import tsx scripts/regression/local-tiankong.test.ts",
+    "test": "node --import tsx scripts/regression/pan-integrity.test.ts && node --import tsx scripts/regression/dst-cn.test.ts && node --import tsx scripts/regression/clock-adjust.test.ts && node --import tsx scripts/regression/sizhu-lichun-boundary.test.ts && node --import tsx scripts/regression/hongluan-tianxi.test.ts && node --import tsx scripts/regression/famous-hour-consistency.test.ts && node --import tsx scripts/regression/iztro-time-index-boundary.test.ts && node --import tsx scripts/regression/solar-date-exists.test.ts && node --import tsx scripts/regression/natal-dual-sihua-same-palace.test.ts && node --import tsx scripts/regression/neutral-naming.test.ts && node --import tsx scripts/regression/local-time.test.ts && node --import tsx scripts/regression/local-analysis.test.ts && node --import tsx scripts/regression/local-storage-ai.test.ts && node --import tsx scripts/regression/local-birth.test.ts && node --import tsx scripts/regression/local-idb.test.ts && node --import tsx scripts/regression/local-school.test.ts && node --import tsx scripts/regression/local-similarity.test.ts && node --import tsx scripts/regression/local-dataset.test.ts && node scripts/regression/local-dataset-worker.test.cjs && node --import tsx scripts/regression/local-tiankong.test.ts && node --import tsx scripts/regression/local-period-analysis.test.ts && node --import tsx scripts/regression/local-pair-analysis.test.ts && node --import tsx scripts/regression/local-study.test.ts",
     "serve:local": "python3 -m http.server 3000 --bind 127.0.0.1 --directory out",
     "test:ui": "node scripts/regression/local-ui.test.cjs",
     "build:dataset-worker": "node scripts/build-dataset-worker.mjs",
-    "predev": "npm run build:dataset-worker",
-    "prebuild": "npm run build:dataset-worker",
-    "pretest": "npm run build:dataset-worker"
+    "predev": "npm run build:dataset-worker && node scripts/build-study-data.mjs",
+    "prebuild": "npm run build:dataset-worker && node scripts/build-study-data.mjs",
+    "pretest": "npm run build:dataset-worker && node scripts/build-study-data.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",

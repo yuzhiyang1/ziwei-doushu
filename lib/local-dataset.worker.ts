@@ -13,7 +13,7 @@ scope.onmessage = async event => {
   try {
     let result;
     if (operation === 'import') result = await importDatasetFileCore(payload.file as File, controller.signal, progress);
-    else if (operation === 'match') result = await findDatasetMatchesCore(payload.chart as ZiweiChart, payload.limit as number, controller.signal, progress);
+    else if (operation === 'match') result = await findDatasetMatchesCore(payload.chart as ZiweiChart, payload.limit as number, controller.signal, progress, payload.scope);
     else if (operation === 'report') result = await readDatasetReportCore(payload.file as File, payload.birth as BirthInfo, controller.signal, progress);
     else throw new Error('未知数据集操作');
     scope.postMessage({ type: 'success', result });
