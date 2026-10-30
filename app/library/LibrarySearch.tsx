@@ -36,7 +36,7 @@ export default function LibrarySearch() {
         value={q}
         onChange={e => setQ(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && submit()}
-        placeholder="搜索古籍原文，如：七杀朝斗 / 双禄朝垣 / 化忌"
+        placeholder="搜索整理摘编，如：七杀朝斗 / 双禄朝垣 / 化忌"
         style={{
           flex: 1,
           padding: '10px 14px',

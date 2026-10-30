@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { chartSimilarity } from '../../components/LocalSimilarity';
+import { generateLocalChart } from '../../lib/local-chart';
+const a=generateLocalChart({year:1990,month:5,day:9,hour:3,gender:'male'});
+const b=generateLocalChart({year:1988,month:1,day:15,hour:6,gender:'female'});
+assert.equal(chartSimilarity(a,a).score,100);
+assert.equal(chartSimilarity(a,b).score,chartSimilarity(b,a).score);
+assert.ok(chartSimilarity(a,b).score<100);
+assert.deepEqual(chartSimilarity(a,b),chartSimilarity(a,b));
+console.log('local similarity: identity, symmetry, input specificity and deterministic repeat passed');

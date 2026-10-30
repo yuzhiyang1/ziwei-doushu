@@ -1,7 +1,7 @@
 /**
  * 古籍原典查询库 — 类型定义
  *
- * 设计：所有古籍以 JSON 静态数据打包到代码（公版无版权风险）
+ * 设计：仓库整理摘编静态打包；含现代转述、待校勘，不能由古籍书名推断逐段来源或授权
  * Next.js 启动时一次性加载到内存，零 DB 依赖
  */
 
@@ -10,11 +10,11 @@ export interface Paragraph {
   id: string;
   /** 段落序号（章节内） */
   idx: number;
-  /** 段落原文（古文） */
+  /** 仓库摘编文本（未逐段校勘，不保证古文原文） */
   text: string;
   /** 现代翻译（可选，未来填充） */
   translation?: string;
-  /** 倪师注解（可选，标注来源） */
+  /** 课程引文（仅有可核查出处时填写，不得自行归于倪师） */
   niNote?: string;
 }
 
@@ -37,7 +37,7 @@ export interface Book {
   author: string;
   /** 简介 */
   intro: string;
-  /** 总字数（粗略）*/
+  /** 上游原书估算字数（不可当作实际收录字数）*/
   wordCount: number;
   chapters: Chapter[];
 }

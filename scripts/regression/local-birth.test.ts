@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { resolveLocalBirth, type LocalBirthInput } from '../../lib/local-birth';
+import { calculateTrueSolarTime } from '../../lib/ziwei/true-solar-time';
+const input: LocalBirthInput = { year:'1990', month:'5', day:'9', clockHour:'23', clockMinute:'55', unknownTime:false, province:'', city:'', longitude:120, gender:'male', name:'测试' };
+assert.equal(resolveLocalBirth(input).day, 10);
+assert.deepEqual(resolveLocalBirth(input).origInput, {year:1990,month:5,day:9,clockHour:23,clockMinute:55});
+assert.equal(resolveLocalBirth({...input,unknownTime:true}).day,9);
+assert.equal(resolveLocalBirth({...input,unknownTime:true}).hour,0);
+assert.equal(resolveLocalBirth({...input,unknownTime:true}).birthTimeUnknown,true);
+assert.equal(resolveLocalBirth({...input,unknownTime:true}).origInput,undefined);
+for(const date of [{year:'1990',month:'2',day:'29'},{year:'2000',month:'4',day:'31'}]) assert.throws(()=>resolveLocalBirth({...input,...date}),RangeError);
+assert.equal(resolveLocalBirth({...input,year:'2000',month:'2',day:'29',clockHour:'12'}).day,29);
+const raw={...input,province:'北京',longitude:116.4,clockHour:'1',clockMinute:'10'};
+assert.equal(resolveLocalBirth(raw).hour, calculateTrueSolarTime({year:1990,month:5,day:9,clockHour:1,clockMinute:10,longitude:116.4}).branch);
+assert.throws(()=>resolveLocalBirth({...input,clockHour:'24'}),RangeError);
+console.log('local birth: invalid/leap dates, midnight rollover, unknown time and single solar correction passed');

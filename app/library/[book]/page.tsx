@@ -15,8 +15,8 @@ export async function generateMetadata({ params }: { params: Promise<{ book: str
   const book = getBookBySlug(slug);
   if (!book) return {};
   return {
-    title: `《${book.title}》· ${book.dynasty} · 紫微斗数古籍原典库`,
-    description: book.intro,
+    title: `《${book.title}》· ${book.dynasty} · 紫微斗数古籍整理摘编库`,
+    description: '仓库整理摘编，待校勘；非完整古籍原文。',
   };
 }
 
@@ -50,7 +50,7 @@ export default async function BookPage({ params }: { params: Promise<{ book: str
             《{book.title}》
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--tx-2)', lineHeight: 1.8, maxWidth: '500px', margin: '0 auto' }}>
-            {book.intro}
+            仓库整理摘编，待校勘；含现代转述，不是完整原文。未提供原作者确认的白话或倪师批注。实收 {book.chapters.flatMap(c=>c.paragraphs).reduce((n,p)=>n+p.text.length,0)} 字符。
           </p>
         </div>
 

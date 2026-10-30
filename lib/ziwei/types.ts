@@ -1,10 +1,27 @@
+export interface LocalSchoolConfig {
+  brightnessSchool: 'default' | 'XD1' | 'XD2' | 'ZZ';
+  leapMonth: 'split' | 'next-month' | 'prev-month' | 'origin-month';
+  lateZishi: 'next-day' | 'current-day';
+  gengSihua?: 'default' | 'GYWTY' | 'GYWFT' | 'GYWFX' | 'GYWTX';
+  tianma?: 'year' | 'lunar-month';
+  tiankong?: 'year' | 'year-hour';
+  jiekong?: 'default' | 'single' | 'zhanyan';
+  kuiyue?: 'default' | 'table2' | 'table3' | 'table4';
+  tianshiTianshang?: 'default' | 'iztro-zhongzhou';
+  changsheng?: 'default' | 'water-earth' | 'fire-earth';
+}
+
 export interface BirthInfo {
+  /** Supported local engine settings, saved together with this birth record. */
+  schoolConfig?: LocalSchoolConfig;
   year: number;      // Gregorian year（已经过子时换日修正后的"排盘日"）
   month: number;     // Gregorian month (1-12)
   day: number;       // Gregorian day
   hour: number;      // 时辰 branch index (0=子, 1=丑, ... 11=亥)
   gender: 'male' | 'female';
   name?: string;
+  /** True when the chart uses a placeholder 子时 because the birth time is unknown. */
+  birthTimeUnknown?: boolean;
   province?: string;   // 出生省份
   city?: string;       // 出生城市
   longitude?: number;  // 出生地经度（用于真太阳时校正）
@@ -57,6 +74,8 @@ export interface SelfSihuaMark {
 }
 
 export interface Palace {
+  /** Optional display of twelve life stages; not an additional natal star. */
+  changsheng12?: string;
   branch: number;      // 0-11 (地支索引)
   stem: number;        // 0-9 (天干索引)
   name: string;        // 宫名

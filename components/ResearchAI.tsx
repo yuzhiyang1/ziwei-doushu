@@ -1,0 +1,15 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import {askAI} from '@/lib/local-ai';
+/** Optional BYOK explanation of explicitly selected material. No background calls or persistence. */
+export default function ResearchAI({context,title='自带模型研读解释'}:{context:unknown;title?:string}){
+ const [endpoint,setEndpoint]=useState(''),[model,setModel]=useState(''),[key,setKey]=useState(''),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[answer,setAnswer]=useState(''),[status,setStatus]=useState('');
+ const active=useRef<AbortController|null>(null),epoch=useRef(0);const contextKey=JSON.stringify(context);
+ useEffect(()=>{epoch.current++;active.current?.abort();active.current=null;setBusy(false);setAnswer('');setStatus('');setConsent(false);return()=>{epoch.current++;active.current?.abort();};},[contextKey]);
+ async function generate(){if(active.current||!consent)return;const request=new AbortController(),version=++epoch.current;active.current=request;setBusy(true);setStatus('');setAnswer('');const timer=setTimeout(()=>request.abort(),90000);
+ try{const result=await askAI({endpoint,model,apiKey:key},{material:context,scope:'仅分析所选资料，来源未核验即说明；不得编造原文、古籍版本、倪师批注或引用。不得给出诊断、用药、针灸操作或确定事件预测。'},[{role:'user',content:'请分四栏研读所选材料：1 材料实际写了什么（简要释义） 2 可以核验的术语与计算关系 3 材料局限、矛盾和待核出处 4 非预测性的现实反思问题。每栏区分原材料与模型推论；不虚构出处，不声称官方或倪师批注。'}],request.signal);if(version===epoch.current){setAnswer(result);setStatus('模型生成解释完成；未经事实审核，不是原作者批注。');}}
+ catch(e){if(version===epoch.current)setStatus(request.signal.aborted?'研读请求已取消或超时':e instanceof Error?e.message:'研读请求失败');}
+ finally{clearTimeout(timer);if(version===epoch.current){active.current=null;setBusy(false);}}
+ }
+ return <section className="local-card" aria-label={title}><h3>{title}</h3><p>可选：只发送你选中的材料给自带模型。生成内容不是倪师批注、不是已考证古籍精解，不提供医疗/财富预测。Key仅此页面内存；不会存入笔记或备份。解释刷新即清除，服务商可能计费并需支持浏览器CORS。</p><label>研读 API Base URL<input aria-label="研读 API Base URL" value={endpoint} onChange={e=>{setEndpoint(e.target.value);setConsent(false);}} disabled={busy}/></label><label>研读模型<input aria-label="研读模型" value={model} onChange={e=>{setModel(e.target.value);setConsent(false);}} disabled={busy}/></label><label>研读 API Key<input aria-label="研读 API Key" type="password" autoComplete="off" value={key} onChange={e=>{setKey(e.target.value);setConsent(false);}} disabled={busy}/></label><label><input type="checkbox" aria-label="同意发送所选研读材料" checked={consent} onChange={e=>setConsent(e.target.checked)} disabled={busy}/>同意将当前所选材料发送到以上服务</label><button disabled={busy||!consent||!key.trim()||!model.trim()||!endpoint.trim()} onClick={generate}>生成自研读解</button>{busy&&<button onClick={()=>active.current?.abort()}>取消研读请求</button>}<button disabled={busy} onClick={()=>{setEndpoint('');setModel('');setKey('');setConsent(false);setAnswer('');setStatus('配置和生成解释已清空');}}>清空研读配置</button><p role="status">{status}</p>{answer&&<article aria-label="模型生成研读解释"><h4>模型生成 · 非原作者批注</h4><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{answer}</pre></article>}</section>;
+}

@@ -1,193 +1,24 @@
 'use client';
-import { motion } from 'framer-motion';
-import { STEMS, SI_HUA_TABLE } from '@/lib/ziwei/constants';
+import { useState } from 'react';
+import { BRANCHES } from '@/lib/ziwei/constants';
 import type { ZiweiChart } from '@/lib/ziwei/types';
-
-export type TimeView = 'mingpan' | 'daxian' | 'liunian';
-
+import { defaultTimeSelection, parseTimeDate, resolveTimeContext, TIME_LABELS, type TimeSelection, type TimeView } from '@/lib/local-time';
+export { getYearStemIndex, buildSiHuaOverlay } from '@/lib/local-time';
+export type { TimeView } from '@/lib/local-time';
 interface TimeNavProps {
-  chart: ZiweiChart;
-  view: TimeView;
-  liunianYear: number;
-  onViewChange: (view: TimeView) => void;
-  onYearChange: (year: number) => void;
+  chart: ZiweiChart; selection?: TimeSelection; onSelectionChange?: (value: TimeSelection)=>void;
+  view?: TimeView; liunianYear?: number; onViewChange?: (view:TimeView)=>void; onYearChange?: (year:number)=>void;
 }
-
-/** 由年份计算天干索引 (0-9) */
-export function getYearStemIndex(year: number): number {
-  return ((year - 4) % 10 + 10) % 10;
-}
-
-/** 根据天干索引返回四化映射：starName → SiHua */
-export function buildSiHuaOverlay(stemIndex: number): Record<string, string> {
-  const stars = SI_HUA_TABLE[stemIndex];
-  if (!stars) return {};
-  return {
-    [stars[0]]: '禄',
-    [stars[1]]: '权',
-    [stars[2]]: '科',
-    [stars[3]]: '忌',
-  };
-}
-
-const SIHUA_COLORS: Record<string, string> = {
-  '禄': '#4ade80',
-  '权': '#60a5fa',
-  '科': '#facc15',
-  '忌': '#f87171',
-};
-
-export default function TimeNav({
-  chart,
-  view,
-  liunianYear,
-  onViewChange,
-  onYearChange,
-}: TimeNavProps) {
-  const currentDx = chart.daXians[chart.currentDaXianIndex];
-
-  // 计算当前叠加四化信息
-  const getOverlayInfo = (): { stemName: string; overlay: Record<string, string> } | null => {
-    if (view === 'mingpan') return null;
-
-    if (view === 'daxian' && currentDx) {
-      const dxPalace = chart.palaces.find(p => p.branch === currentDx.palaceBranch);
-      if (!dxPalace) return null;
-      const stemIndex = dxPalace.stem;
-      return {
-        stemName: STEMS[stemIndex],
-        overlay: buildSiHuaOverlay(stemIndex),
-      };
-    }
-
-    if (view === 'liunian') {
-      const stemIndex = getYearStemIndex(liunianYear);
-      return {
-        stemName: STEMS[stemIndex],
-        overlay: buildSiHuaOverlay(stemIndex),
-      };
-    }
-
-    return null;
-  };
-
-  const overlayInfo = getOverlayInfo();
-
-  return (
-    <div className="mb-3">
-      {/* Tab 行 */}
-      <div
-        className="flex items-center rounded-xl p-1 gap-1"
-        style={{ background: 'var(--t-surface)', border: '1px solid var(--t-border)' }}
-      >
-        {/* 本命 */}
-        <TabButton
-          active={view === 'mingpan'}
-          onClick={() => onViewChange('mingpan')}
-        >
-          本命
-        </TabButton>
-
-        {/* 大限 */}
-        <TabButton
-          active={view === 'daxian'}
-          onClick={() => onViewChange('daxian')}
-        >
-          {currentDx ? `大限 ${currentDx.startAge}–${currentDx.endAge}` : '大限'}
-        </TabButton>
-
-        {/* 流年 — 含年份切换 */}
-        <div
-          className="relative flex-1 flex items-center justify-center rounded-lg py-1.5 gap-1 transition-all duration-200"
-          style={{
-            background: view === 'liunian'
-              ? 'rgba(212,168,67,0.12)'
-              : 'transparent',
-            border: view === 'liunian'
-              ? '1px solid rgba(212,168,67,0.25)'
-              : '1px solid transparent',
-          }}
-        >
-          <button
-            onClick={() => onViewChange('liunian')}
-            className="text-[10px] font-medium flex-1 text-center"
-            style={{ color: view === 'liunian' ? 'var(--t-gold)' : 'var(--t-faint)' }}
-          >
-            流年
-          </button>
-          {/* 年份 +/- */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={e => { e.stopPropagation(); onYearChange(liunianYear - 1); if (view !== 'liunian') onViewChange('liunian'); }}
-              className="text-[9px] w-4 h-4 flex items-center justify-center rounded"
-              style={{ color: 'var(--t-faint)' }}
-            >
-              ‹
-            </button>
-            <span
-              className="text-[10px] font-mono min-w-[28px] text-center cursor-pointer"
-              style={{ color: view === 'liunian' ? 'var(--t-gold)' : 'var(--t-faint)' }}
-              onClick={() => onViewChange('liunian')}
-            >
-              {liunianYear}
-            </span>
-            <button
-              onClick={e => { e.stopPropagation(); onYearChange(liunianYear + 1); if (view !== 'liunian') onViewChange('liunian'); }}
-              className="text-[9px] w-4 h-4 flex items-center justify-center rounded"
-              style={{ color: 'var(--t-faint)' }}
-            >
-              ›
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 叠加四化说明行 */}
-      {overlayInfo && (
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="flex items-center gap-2 mt-1.5 px-1 flex-wrap"
-        >
-          <span className="text-[9px]" style={{ color: 'var(--t-faint)' }}>
-            {view === 'daxian' ? '大限' : `${liunianYear}`}·{overlayInfo.stemName}年四化：
-          </span>
-          {(['禄', '权', '科', '忌'] as const).map(sh => {
-            const starName = Object.keys(overlayInfo.overlay).find(k => overlayInfo.overlay[k] === sh);
-            if (!starName) return null;
-            return (
-              <span key={sh} className="text-[9px] font-medium" style={{ color: SIHUA_COLORS[sh] }}>
-                {starName}化{sh}
-              </span>
-            );
-          })}
-        </motion.div>
-      )}
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex-1 py-1.5 text-[10px] font-medium rounded-lg transition-all duration-200"
-      style={{
-        background: active ? 'rgba(212,168,67,0.12)' : 'transparent',
-        color: active ? 'var(--t-gold)' : 'var(--t-faint)',
-        border: active ? '1px solid rgba(212,168,67,0.25)' : '1px solid transparent',
-      }}
-    >
-      {children}
-    </button>
-  );
+export default function TimeNav({chart,selection,onSelectionChange,view,liunianYear,onViewChange,onYearChange}:TimeNavProps) {
+  const [dateError,setDateError]=useState('');
+  const value=selection ?? {...defaultTimeSelection(chart),view:view ?? 'mingpan',date:`${liunianYear??new Date().getFullYear()}-07-01`};
+  const update=(patch:Partial<TimeSelection>)=>{ const next={...value,...patch}; onSelectionChange?.(next); if(patch.view) onViewChange?.(patch.view); if(patch.date) onYearChange?.(Number(patch.date.slice(0,4))); };
+  let description=''; try { description=resolveTimeContext(chart,value).description; } catch(e) {description=e instanceof Error?e.message:'无法计算运限';}
+  return <section className="rounded-xl p-3 space-y-3" style={{background:'var(--t-surface)',border:'1px solid var(--t-border)'}} aria-label="时间导航">
+    <div className="flex flex-wrap gap-2">{(Object.keys(TIME_LABELS) as TimeView[]).map(v=><button type="button" key={v} aria-pressed={value.view===v} onClick={()=>update({view:v})} className="rounded px-3 py-2 text-sm" style={{background:value.view===v?'rgba(212,168,67,.2)':'transparent'}}>{TIME_LABELS[v]}</button>)}</div>
+    {value.view==='daxian' && <label className="block text-sm">选择大限 <select aria-label="选择大限" value={value.daXianIndex} onChange={e=>update({daXianIndex:Number(e.target.value)})}>{chart.daXians.map((dx,i)=><option key={i} value={i}>{dx.startAge}–{dx.endAge}虚岁 · {dx.palaceName}</option>)}</select></label>}
+    {value.view!=='mingpan' && value.view!=='daxian' && <div className="flex flex-wrap gap-3 text-sm"><label>运限公历日期 <input aria-label="运限公历日期" type="date" min="1900-01-01" max="2100-12-31" value={value.date} onChange={e=>{try{parseTimeDate(e.target.value);setDateError('');update({date:e.target.value});}catch(err){setDateError(err instanceof Error?err.message:'无效日期');}}}/></label><label>运限时辰 <select aria-label="运限时辰" value={value.hour} onChange={e=>update({hour:Number(e.target.value)})}>{BRANCHES.map((b,i)=><option key={b} value={i}>{b}时</option>)}</select></label></div>}
+    {dateError && <p role="alert" className="text-xs text-red-500">{dateError}（仍保留上次有效选择）</p>}
+    <p className="text-xs leading-relaxed" data-testid="time-context">{description}</p>
+  </section>;
 }

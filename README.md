@@ -1,3 +1,5 @@
+> **个人本地版分支**：请先阅读 [LOCAL_EDITION.md](./LOCAL_EDITION.md) 的运行方法、功能矩阵与未验收项。本分支不等于官网专业版解锁。
+
 <div align="center">
 
 # 紫微斗数 · 开源排盘引擎

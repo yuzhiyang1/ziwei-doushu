@@ -1,3 +1,6 @@
+'use client';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 /**
  * /library/search?q=xxx — 搜索结果页
  */
@@ -5,13 +8,14 @@
 import Link from 'next/link';
 import { searchClassics, getParagraphById } from '@/lib/classics';
 
-export const metadata = {
-  title: '搜索 · 古籍原典库',
-};
 
-export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const sp = await searchParams;
-  const q = sp.q?.trim() || '';
+
+export default function SearchPage() { return <Suspense fallback={<p>载入搜索…</p>}><SearchContent /></Suspense>; }
+function SearchContent() {
+  const params=useSearchParams(), router=useRouter();
+  const urlQuery=params.get('q')?.trim()||'';
+  const [q,setQ]=useState(urlQuery);
+  useEffect(()=>{setQ(urlQuery);},[urlQuery]);
   const hits = q ? searchClassics(q, 50) : [];
 
   return (
@@ -30,7 +34,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
+        <div className="text-center mb-10"><label>搜索摘编 <input aria-label="搜索摘编" value={q} onChange={e=>{setQ(e.target.value);router.replace('/library/search?q='+encodeURIComponent(e.target.value),{scroll:false});}} style={{color:"var(--tx-0)",background:"var(--bg-card)",padding:12}} /></label>
           <div style={{ fontSize: '13px', color: 'var(--tx-3)', letterSpacing: '0.15em', marginBottom: '4px' }}>
             搜索关键词
           </div>
@@ -38,7 +42,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             「{q || '（空）'}」
           </h1>
           <div style={{ fontSize: '12px', color: 'var(--tx-3)', marginTop: '8px' }}>
-            共找到 <strong style={{ color: 'var(--ac)' }}>{hits.length}</strong> 条古籍原文匹配
+            共找到 <strong style={{ color: 'var(--ac)' }}>{hits.length}</strong> 条整理摘编匹配
           </div>
         </div>
 

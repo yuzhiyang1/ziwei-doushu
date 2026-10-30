@@ -1,369 +1,97 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import BirthForm, { type BirthFormState } from '@/components/BirthForm';
-import { formToBirthInfo } from '@/lib/ziwei/share';
-import { generateChart as buildChart } from '@/lib/ziwei/algorithm';
+import ChartBoard from '@/components/ChartBoard';
+import LocalArchives from '@/components/LocalArchives';
+import ChatPanel from '@/components/ChatPanel';
+import { chartId } from '@/lib/local-store';
+import { generateLocalChart as generateChart } from '@/lib/local-chart';
+import LocalSchoolSettings from '@/components/LocalSchoolSettings';
+import { LOCAL_ANALYSIS_NOTICE } from '@/lib/local-analysis';
+import { buildPairAnalysis, formatEnhancedPairReport, PAIR_ANALYSIS_NOTICE } from '@/lib/local-pair-analysis';
+import { BRANCHES } from '@/lib/ziwei/constants';
 import type { BirthInfo, ZiweiChart } from '@/lib/ziwei/types';
-import { useTheme } from '@/components/ThemeProvider';
-
-// ─── AiContent 渲染器（与 InsightPanel 一致）────────────────
-function AiContent({ text, streaming }: { text: string; streaming?: boolean }) {
-  const lines = text.split('\n');
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      {lines.map((line, i) => {
-        const sectionMatch = line.match(/^\*\*【(.+?)】\*\*$/);
-        if (sectionMatch) {
-          return (
-            <div key={i} style={{ paddingTop: i === 0 ? 0 : '14px', paddingBottom: '4px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--ac)', letterSpacing: '0.04em' }}>
-                【{sectionMatch[1]}】
-              </span>
-            </div>
-          );
-        }
-        if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />;
-        const parts = line.split(/\*\*(.+?)\*\*/);
-        return (
-          <div key={i} style={{ fontSize: '13px', lineHeight: 1.75, color: 'var(--tx-2)' }}>
-            {parts.map((part, j) =>
-              j % 2 === 0
-                ? part
-                : <strong key={j} style={{ fontWeight: 500, color: 'var(--tx-0)' }}>{part}</strong>
-            )}
-          </div>
-        );
-      })}
-      {streaming && (
-        <span style={{
-          display: 'inline-block', width: '7px', height: '13px',
-          background: 'var(--ac)', opacity: 0.5, borderRadius: '2px',
-          animation: 'pulse 1s ease-in-out infinite',
-          verticalAlign: 'middle', marginLeft: '2px',
-        }} />
-      )}
-    </div>
-  );
-}
 
 export default function HemingPage() {
-  const router = useRouter();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
-
-  // ─── 双方命盘状态 ─────────────────────────────────────────
-  const [chartA, setChartA] = useState<ZiweiChart | null>(null);
-  const [chartB, setChartB] = useState<ZiweiChart | null>(null);
-  // 双方表单状态由 BirthForm onFormSave 同步到此处，统一按钮触发起盘
-  const [formA, setFormA] = useState<BirthFormState | null>(null);
-  const [formB, setFormB] = useState<BirthFormState | null>(null);
-
-  // ─── AI 合盘分析状态 ─────────────────────────────────────
-  const [analysis, setAnalysis] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [question, setQuestion] = useState('');
-  const [analysisError, setAnalysisError] = useState(false);
-  // 开源版不含 /api/heming：接口 404 时单独说明，而不是让用户反复重试
-  const [apiMissing, setApiMissing] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const analysisRef = useRef<HTMLDivElement>(null);
-
-  // ─── 起盘（单次调用，返回 chart 给统一流程使用）──────────
-  // 开源版不含后端 /api/generate：直接用本仓库的排盘引擎在浏览器里起盘
-  const generateChart = useCallback(async (info: BirthInfo): Promise<ZiweiChart | null> => {
+  const [charts, setCharts] = useState<[ZiweiChart | null, ZiweiChart | null]>([null, null]);
+  const [forms, setForms] = useState<[BirthFormState | undefined, BirthFormState | undefined]>([undefined, undefined]);
+  const [savedForms, setSavedForms] = useState<[BirthFormState | undefined, BirthFormState | undefined]>([undefined, undefined]);
+  const [editing, setEditing] = useState<[boolean, boolean]>([true, true]);
+  const [error, setError] = useState('');
+  const [showBoards, setShowBoards] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const submit = (index: 0 | 1, info: BirthInfo) => {
     try {
-      return buildChart(info);
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // 表单是否填齐
-  const isFormReady = (f: BirthFormState | null): boolean =>
-    !!(f && f.year && f.month && f.day && f.gender && (f.unknownTime || (f.clockHour !== '' && f.clockMinute !== '')));
-
-  // ─── 统一入口：起盘 + 合盘分析 ─────────────────────────────
-  const runAnalysis = useCallback(async (q?: string) => {
-    setFormError(null);
-    if (!isFormReady(formA) || !isFormReady(formB)) {
-      setFormError('请先填写双方完整出生信息');
-      return;
-    }
-    setAnalyzing(true);
-    setAnalysis('');
-    setAnalysisError(false);
-
-    try {
-      // 并行起两张盘（如果还没起）
-      let cA = chartA;
-      let cB = chartB;
-      const [newA, newB] = await Promise.all([
-        cA ? Promise.resolve(cA) : generateChart(formToBirthInfo(formA!)),
-        cB ? Promise.resolve(cB) : generateChart(formToBirthInfo(formB!)),
-      ]);
-      cA = newA;
-      cB = newB;
-      if (!cA || !cB) {
-        setAnalysisError(true);
-        setAnalyzing(false);
-        return;
-      }
-      if (!chartA) setChartA(cA);
-      if (!chartB) setChartB(cB);
-
-      const res = await fetch('/api/heming', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chartA: cA, chartB: cB, question: q ?? undefined }),
-      });
-      if (res.status === 404) { setApiMissing(true); throw new Error('api-missing'); }
-      if (!res.ok || !res.body) throw new Error();
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let text = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') break;
-          try {
-            const delta = JSON.parse(data).delta?.text ?? '';
-            text += delta;
-            setAnalysis(text);
-          } catch { /* skip */ }
-        }
-      }
-      // scroll to analysis
-      setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    } catch {
-      setAnalysisError(true);
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [chartA, chartB, formA, formB, generateChart]);
-
-  const cardStyle = {
-    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.9)',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(200,160,60,0.2)'}`,
-    borderRadius: '16px',
-    padding: '24px',
+      const chart = generateChart({ ...info, schoolConfig: charts[index]?.birthInfo.schoolConfig });
+      setCharts(prev => index === 0 ? [chart, prev[1]] : [prev[0], chart]);
+      setEditing(prev => index === 0 ? [false, prev[1]] : [prev[0], false]);
+      setSavedForms(prev => index === 0 ? [forms[0], prev[1]] : [prev[0], forms[1]]);
+      setConfirmed(false); setShowAI(false); setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : '生成失败，请核对输入'); }
   };
-
-  const labelStyle = {
-    fontSize: '10px', letterSpacing: '0.4em', color: 'var(--ac)', opacity: 0.7,
-    marginBottom: '16px', display: 'block',
+  const a = charts[0], b = charts[1];
+  const ready = !!a && !!b && !editing.some(Boolean);
+  const sections = ready ? buildPairAnalysis(a!, b!) : [];
+  const report = ready ? formatEnhancedPairReport(a!, b!) : '';
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([report], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = '双人命盘结构对照.txt'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-0)' }}>
-      {/* 顶栏 */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        background: isDark ? 'rgba(2,8,16,0.88)' : 'rgba(250,245,235,0.92)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--bdr)',
-        display: 'flex', alignItems: 'center', padding: '0 24px', height: '52px', gap: '16px',
-      }}>
-        <button
-          onClick={() => router.push('/')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px',
-            color: 'var(--tx-3)', background: 'none', border: 'none', cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>‹</span>
-          <span>返回</span>
-        </button>
-        <div style={{ width: '1px', height: '20px', background: 'var(--bdr-med)' }} />
-        <span style={{ fontSize: '12px', color: 'var(--ac)', letterSpacing: '0.2em' }}>合盘分析</span>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: '11px', color: 'var(--tx-3)' }}>感情 · 合伙 · 亲子 · 朋友</span>
-      </header>
-
-      {/* 主体 */}
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px 80px' }}>
-
-        {/* 标题 */}
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{ fontSize: '28px', color: 'var(--ac)', opacity: 0.15, marginBottom: '12px' }}>☯</div>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '0.15em', color: 'var(--tx-0)', marginBottom: '8px' }}>
-            紫微合盘
-          </h1>
-          <p style={{ fontSize: '13px', color: 'var(--tx-3)', lineHeight: 1.6 }}>
-            输入两个人的出生信息，AI 基于倪海厦体系分析双方命盘的缘分匹配度、感情走向与相处建议
-          </p>
+  return <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <nav><a href="/chart" className="underline">← 个人命盘</a></nav>
+    <h1 className="text-2xl font-semibold">本地双人合盘</h1>
+    <p className="text-sm leading-relaxed">{LOCAL_ANALYSIS_NOTICE} 以下结构对照完全在浏览器计算，无需账号、付费或服务器。请先取得对方同意，不要擅自输入他人生辰。</p>
+    <div className="grid md:grid-cols-2 gap-6">{([0, 1] as const).map(i => <section key={i} className="card-glass rounded-xl p-4 space-y-3">
+      <h2 className="text-lg">{i === 0 ? '甲方' : '乙方'}</h2>
+      {editing[i] ? <>
+        <BirthForm initialData={forms[i]} onFormSave={data => setForms(prev => i === 0 ? [data, prev[1]] : [prev[0], data])} onSubmit={info => submit(i, info)} />
+        {charts[i] && <button type="button" className="border rounded px-3 py-2" onClick={() => { setForms(prev => i === 0 ? [savedForms[0], prev[1]] : [prev[0], savedForms[1]]); setEditing(prev => i === 0 ? [false, prev[1]] : [prev[0], false]); }}>取消编辑，保留原盘</button>}
+      </> : <>
+        <p>{charts[i]?.birthInfo.name || '未命名'} · {charts[i]?.birthInfo.year}-{charts[i]?.birthInfo.month}-{charts[i]?.birthInfo.day} · {charts[i]?.wuxingJuName}</p>
+        <button type="button" className="border rounded px-3 py-2" onClick={() => { setEditing(prev => i === 0 ? [true, prev[1]] : [prev[0], true]); setShowAI(false); }}>编辑并重新排盘</button>
+      </>}
+      {charts[i] && !editing[i] && <LocalSchoolSettings birth={charts[i]!.birthInfo} onChange={chart => { setCharts(prev => i === 0 ? [chart, prev[1]] : [prev[0], chart]); setConfirmed(false); setShowAI(false); }} />}
+      <LocalArchives chart={charts[i]} onLoad={birth => {
+        const chart = generateChart(birth);
+        setCharts(prev => i === 0 ? [chart, prev[1]] : [prev[0], chart]);
+        setForms(prev => i === 0 ? [undefined, prev[1]] : [prev[0], undefined]);
+        setSavedForms(prev => i === 0 ? [undefined, prev[1]] : [prev[0], undefined]);
+        setEditing(prev => i === 0 ? [false, prev[1]] : [prev[0], false]);
+        setConfirmed(false); setShowAI(false);
+      }} />
+      {charts[i] && !savedForms[i] && <p className="text-xs">档案按已保存时辰直接排盘；若要编辑，请重新输入原始出生信息，避免把时辰推测为精确钟表时间。</p>}
+    </section>)}</div>
+    {error && <p role="alert">{error}</p>}
+    {!ready && <p>请分别完成双方排盘；编辑时先保存或取消，避免展示过期合盘。</p>}
+    {ready && <section className="space-y-4" aria-label="合盘结果">
+      <h2 className="text-xl">十二宫结构对照</h2>
+      {(a?.birthInfo.birthTimeUnknown || b?.birthInfo.birthTimeUnknown) && <p role="alert">至少一方时辰未知，以下仅为子时示例，不能用于精确合盘。</p>}
+      <p className="text-sm">主星重合度 = 同名宫的共同主星数 ÷ 主星并集数。空宫均为空时不计分，不借对宫计分。这是结构相似度，不是感情匹配、婚姻成功率或命运判断。</p>
+      <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr><th className="p-2">宫位</th><th>甲方主星</th><th>乙方主星</th><th>结构重合</th></tr></thead><tbody>{sections.map(row => <tr key={row.palace} className="border-t"><th className="p-2">{row.palace}</th><td>{row.a.major.join('、') || '空宫'}</td><td>{row.b.major.join('、') || '空宫'}</td><td>{row.score === null ? '不计分' : `${row.score}%`}</td></tr>)}</tbody></table></div>
+      <p className="text-sm">{PAIR_ANALYSIS_NOTICE}</p>
+      <div className="space-y-3" aria-label="逐宫双盘研究">{sections.map(section => <details key={section.id} className="card-glass p-4 rounded-xl">
+        <summary className="cursor-pointer font-semibold">{section.title} · {section.score === null ? '不计分' : `主星重合 ${section.score}%`}</summary>
+        <div className="space-y-3 mt-3 text-sm">
+          {section.warnings.map(warning => <p key={warning} role="note">注意：{warning}</p>)}
+          <h3 className="font-semibold">盘面事实（各自命盘）</h3>
+          <div className="grid md:grid-cols-2 gap-3">{([['甲方', section.a], ['乙方', section.b]] as const).map(([label, evidence]) => <section key={label}>
+            <h4>{label}</h4><p>{evidence.detail}</p>
+            <ul className="mt-2 space-y-1">{evidence.network.map(p => <li key={p.relation}>{p.relation}：{p.palace}（{BRANCHES[p.branch]}）· {p.major.join('、') || '无主星'}；四化 {p.hua.join('、') || '无记录'}</li>)}</ul>
+          </section>)}</div>
+          <h3 className="font-semibold">集合算术（不是适婚评分）</h3>
+          {section.arithmetic.map(line => <p key={line}>{line}</p>)}
+          <h3 className="font-semibold">主题参照与研究问题</h3><p>{section.themeBasis}</p>
+          <ul className="list-disc pl-5">{section.questions.map(question => <li key={question}>{question}</li>)}</ul>
+          {section.sources.map(source => <p className="text-xs" key={source.href}><a className="underline" href={source.href}>{source.title}</a>：{source.scope}</p>)}
         </div>
-
-        {/* 双栏表单 */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}
-          className="heming-grid">
-          {/* 甲方 */}
-          <div style={cardStyle}>
-            <span style={labelStyle}>甲方 — A</span>
-            <BirthForm
-              hideSubmit
-              onSubmit={() => {}}
-              onFormSave={setFormA}
-            />
-          </div>
-
-          {/* 乙方 */}
-          <div style={cardStyle}>
-            <span style={labelStyle}>乙方 — B</span>
-            <BirthForm
-              hideSubmit
-              onSubmit={() => {}}
-              onFormSave={setFormB}
-            />
-          </div>
-        </div>
-
-        {/* ═══ 大合盘分析框（视觉中心，始终显示）════════════════ */}
-        <div ref={analysisRef} style={{
-          ...cardStyle,
-          minHeight: '320px',
-          padding: '32px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: (!analysis && !analyzing) ? 'center' : 'flex-start',
-        }}>
-          {/* 区块标题 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: (analysis || analyzing) ? '20px' : '24px' }}>
-            <span style={{ color: 'var(--ac)', opacity: 0.6 }}>◉</span>
-            <span style={{ fontSize: '11px', letterSpacing: '0.3em', color: 'var(--tx-3)' }}>合盘分析 · HEMING</span>
-          </div>
-
-          {/* 状态分支 */}
-          {!analysis && !analyzing && (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: '13px', color: 'var(--tx-3)', marginBottom: '24px', lineHeight: 1.7 }}>
-                填好双方出生信息后，点击下方按钮<br />
-                AI 将基于倪海厦体系深度分析两人缘分匹配度
-              </div>
-              <button
-                onClick={() => runAnalysis()}
-                style={{
-                  padding: '14px 40px', borderRadius: 'var(--r-pill)', border: 'none',
-                  background: 'linear-gradient(135deg, #9a6210, #c88020)',
-                  color: '#fff8e8', fontSize: '14px', fontWeight: 600,
-                  letterSpacing: '0.15em', cursor: 'pointer',
-                  boxShadow: '0 4px 16px rgba(140,100,20,0.25)',
-                  transition: 'transform 0.15s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(0)'; }}
-              >
-                开始合盘分析
-              </button>
-              {formError && (
-                <div style={{ marginTop: '20px', fontSize: '13px', color: '#dc2626' }}>
-                  {formError}
-                </div>
-              )}
-            </div>
-          )}
-
-          {analyzing && !analysis && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '40px 0', color: 'var(--tx-3)', fontSize: '13px' }}>
-              <div style={{
-                width: '14px', height: '14px',
-                border: '2px solid var(--bdr-med)', borderTopColor: 'var(--ac)',
-                borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-              }} />
-              正在对比双方命盘…
-            </div>
-          )}
-
-          {analysis && <AiContent text={analysis} streaming={analyzing} />}
-
-          {analysisError && (
-            <div style={{ padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--bdr)', background: 'var(--bg-card)', fontSize: '13px', color: 'var(--tx-2)', marginTop: '12px' }}>
-              {apiMissing
-                ? '开源版不含合盘 AI 分析接口（/api/heming），需要你自己实现后才能用。两人的命盘可以分别到「排盘」页（/chart）查看。'
-                : '分析暂时不可用，请重试。'}
-            </div>
-          )}
-        </div>
-
-        {/* ═══ 针对合盘的追问聊天框（仅分析完成后显示）═══════════ */}
-        {analysis && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-            <div style={{ fontSize: '11px', letterSpacing: '0.2em', color: 'var(--tx-3)', marginBottom: '4px' }}>
-              针对此次合盘继续追问
-            </div>
-
-            {/* 快捷问题 */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {[
-                '感情匹配度如何？',
-                '适合合伙创业吗？',
-                '两人结婚是否合适？',
-                '哪方面最容易产生矛盾？',
-                '财运是否互补？',
-              ].map(q => (
-                <button
-                  key={q}
-                  onClick={() => { setQuestion(q); runAnalysis(q); }}
-                  disabled={analyzing}
-                  style={{
-                    fontSize: '12px', padding: '6px 14px',
-                    borderRadius: 'var(--r-pill)',
-                    border: '1px solid var(--bdr-med)',
-                    background: 'transparent', color: 'var(--tx-2)',
-                    cursor: analyzing ? 'not-allowed' : 'pointer',
-                    opacity: analyzing ? 0.5 : 1,
-                    transition: 'border-color 0.15s',
-                  }}
-                  onMouseEnter={e => { if (!analyzing) (e.currentTarget as HTMLElement).style.borderColor = 'var(--ac-bdr)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--bdr-med)'; }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-
-            {/* 输入框 + 追问按钮 */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !analyzing) runAnalysis(question || undefined); }}
-                placeholder="继续追问，如：哪几年是两人感情关键期？"
-                disabled={analyzing}
-                className="input-base"
-                style={{ fontSize: '13px', flex: 1 }}
-              />
-              <button
-                onClick={() => runAnalysis(question || undefined)}
-                disabled={analyzing}
-                style={{
-                  padding: '10px 20px', borderRadius: 'var(--r-sm)', border: 'none',
-                  background: analyzing ? 'var(--bg-2)' : 'var(--tx-0)',
-                  color: analyzing ? 'var(--tx-3)' : 'white',
-                  fontSize: '13px', fontWeight: 500,
-                  cursor: analyzing ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s', whiteSpace: 'nowrap',
-                }}
-              >
-                {analyzing ? '分析中…' : '继续追问'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <style>{`
-        @media (max-width: 680px) {
-          .heming-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-    </div>
-  );
+      </details>)}</div>
+      <div className="flex gap-3 flex-wrap"><button type="button" className="border rounded px-3 py-2" onClick={download}>下载完整对照报告</button><button type="button" className="border rounded px-3 py-2" onClick={() => setShowBoards(v => !v)}>{showBoards ? '收起' : '展开'}双方命盘</button></div>
+      {showBoards && <div className="grid xl:grid-cols-2 gap-4"><section><h3>甲方</h3><ChartBoard chart={a!} /></section><section><h3>乙方</h3><ChartBoard chart={b!} /></section></div>}
+      <label className="block text-sm"><input type="checkbox" checked={confirmed} onChange={e => { setConfirmed(e.target.checked); if (!e.target.checked) setShowAI(false); }} /> 我已取得双方同意，允许将双方命盘与问题发给我自行配置的模型服务（开启设置不自动发送）</label>
+      <button type="button" disabled={!confirmed} className="border rounded px-3 py-2 disabled:opacity-40" onClick={() => setShowAI(v => !v)}>{showAI ? '关闭 AI 问答' : '开启自带模型合盘问答'}</button>
+      {showAI && confirmed && <ChatPanel key={report} chart={a!} context={report} historyKey={JSON.stringify([chartId(a!), chartId(b!)])} />}
+    </section>}
+  </main>;
 }
