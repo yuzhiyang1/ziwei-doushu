@@ -7,3 +7,6 @@ dist/
 *.tsbuildinfo
 .DS_Store
 node_modules
+
+# Static personal build output
+out/

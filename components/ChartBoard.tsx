@@ -4,12 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { ZiweiChart, Palace, Star } from '@/lib/ziwei/types';
 import { BRANCHES, STEMS } from '@/lib/ziwei/constants';
 import PalaceCell from './PalaceCell';
-import TimeNav, { type TimeView, getYearStemIndex, buildSiHuaOverlay } from './TimeNav';
+import TimeNav, { type TimeView } from './TimeNav';
+import { defaultTimeSelection, resolveTimeContext, type TimeSelection } from '@/lib/local-time';
 
 interface ChartBoardProps {
   chart: ZiweiChart;
+  selection?: TimeSelection;
+  onSelectionChange?: (selection: TimeSelection) => void;
+  hideTimeNav?: boolean;
   onStarSelect?: (star: Star, palace: Palace) => void;
-  onPalaceSelect?: (palace: Palace) => void;
+  onPalaceSelect?: (palace: Palace | null) => void;
   onSiHuaClick?: (starName: string, siHua: string, view: TimeView) => void;
 }
 
@@ -52,31 +56,22 @@ function getSanFangSiZheng(branch: number): [number, number, number, number] {
 
 const ANIMATION_ORDER = [5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4];
 
-export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHuaClick }: ChartBoardProps) {
+export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHuaClick, selection, onSelectionChange, hideTimeNav }: ChartBoardProps) {
   const [selectedBranch, setSelectedBranch] = useState<number | null>(null);
-  const [timeView, setTimeView] = useState<TimeView>('mingpan');
-  const [liunianYear, setLiunianYear] = useState<number>(new Date().getFullYear());
-
+  const [internalSelection, setInternalSelection] = useState<TimeSelection>(()=>defaultTimeSelection(chart));
+  const timeSelection=selection ?? internalSelection;
+  const setTimeSelection=(next:TimeSelection)=>{setInternalSelection(next);onSelectionChange?.(next);};
+  const timeView=timeSelection.view;
+  const context=resolveTimeContext(chart,timeSelection);
   const palaceMap: Record<number, Palace> = {};
   chart.palaces.forEach(p => { palaceMap[p.branch] = p; });
-
-  // 计算当前叠加四化数据（大限或流年）
-  const currentDx = chart.daXians[chart.currentDaXianIndex];
-  const overlayData: Record<string, string> = (() => {
-    if (timeView === 'daxian' && currentDx) {
-      const dxPalace = chart.palaces.find(p => p.branch === currentDx.palaceBranch);
-      if (dxPalace) return buildSiHuaOverlay(dxPalace.stem);
-    }
-    if (timeView === 'liunian') {
-      return buildSiHuaOverlay(getYearStemIndex(liunianYear));
-    }
-    return {};
-  })();
-  const overlayLabel = timeView === 'daxian' ? '限' : timeView === 'liunian' ? '年' : undefined;
+  const overlayData=context.overlay;
+  const overlayLabel=timeView==='mingpan'?undefined:context.label.slice(0,1);
 
   const handlePalaceClick = (branch: number) => {
     const isDeselecting = selectedBranch === branch;
     setSelectedBranch(prev => prev === branch ? null : branch);
+    if (isDeselecting) onPalaceSelect?.(null);
     if (!isDeselecting) {
       const palace = palaceMap[branch];
       if (palace) onPalaceSelect?.(palace);
@@ -90,13 +85,8 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
   return (
     <div className="w-full select-none">
       {/* 时间导航轴 */}
-      <TimeNav
-        chart={chart}
-        view={timeView}
-        liunianYear={liunianYear}
-        onViewChange={setTimeView}
-        onYearChange={setLiunianYear}
-      />
+      {!hideTimeNav && <TimeNav chart={chart} selection={timeSelection} onSelectionChange={setTimeSelection} />}
+
 
       {/* 命盘标题 */}
       <motion.div
@@ -130,6 +120,11 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
           if (!palace) return null;
           return (
             <div key={branch} style={{ gridRow: row, gridColumn: col, background: 'var(--t-bg)' }}>
+              {timeView !== 'mingpan' && <div className="px-2 py-1 text-[10px]" style={{color:'var(--t-gold)'}} data-testid={`transit-${branch}`}>
+                {context.label} · {context.palaceNames[branch]}
+                {context.mingBranch===branch ? ' ◎' : ''}
+                {context.transitStars[branch]?.length ? <div className="opacity-70">流曜：{context.transitStars[branch].join('、')}</div> : null}
+              </div>}
               <PalaceCell
                 palace={palace}
                 onClick={() => handlePalaceClick(branch)}
@@ -166,12 +161,12 @@ export default function ChartBoard({ chart, onStarSelect, onPalaceSelect, onSiHu
             </div>
           </div>
 
-          {chart.currentDaXianIndex >= 0 && (() => {
-            const dx = chart.daXians[chart.currentDaXianIndex];
+          {(timeView==='mingpan'?chart.currentDaXianIndex:context.effectiveDaXianIndex) >= 0 && (() => {
+            const dx = chart.daXians[timeView==='mingpan'?chart.currentDaXianIndex:context.effectiveDaXianIndex];
             return (
               <div className="border border-purple-500/30 rounded-lg px-3 py-1.5 text-center"
                 style={{ background: 'rgba(147,51,234,0.06)' }}>
-                <div className="text-[8px] text-purple-500/80 mb-0.5 tracking-wider">当前大限</div>
+                <div className="text-[8px] text-purple-500/80 mb-0.5 tracking-wider">{timeView==='mingpan'?'当前大限':'所选所属大限'}</div>
                 <div className="text-[12px] text-purple-400 font-medium tabular-nums">{dx.startAge}–{dx.endAge}岁</div>
                 <div className="text-[9px] text-purple-500/60">{dx.palaceName}</div>
               </div>

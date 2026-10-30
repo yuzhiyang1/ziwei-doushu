@@ -434,3 +434,31 @@ body {
    select 本身是半透明底 + 浅色字，Windows 上原生下拉列表是白底，浅灰字配白底看不清（#14） */
 [data-theme="dark"] select { color-scheme: dark; }
 [data-theme="dark"] select option { background-color: var(--bg-2); color: var(--tx-1); }
+
+/* Personal local edition: responsive, readable controls without tracking. */
+.local-shell { max-width: 1200px; margin: auto; padding: 32px 20px 80px; color: var(--t-text); }
+.local-shell h1 { font-size: clamp(28px,4vw,42px); margin: 24px 0 16px; font-weight: 700; }
+.local-shell h2 { font-size: 20px; margin: 12px 0; font-weight: 600; }
+.local-shell h3 { font-size: 17px; margin: 16px 0 8px; font-weight: 600; }
+.local-shell p { line-height: 1.8; margin: 12px 0; }
+.local-kicker { color: var(--t-gold); letter-spacing: .2em; }
+.local-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 16px; margin: 24px 0; }
+.local-card { display: block; border: 1px solid var(--t-border); background: var(--t-surface); border-radius: 14px; padding: 20px; margin: 14px 0; }
+.local-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:16px 0; }
+.local-shell input,.local-shell select,.local-shell textarea { background: var(--t-card); color:var(--t-text); border:1px solid var(--t-border); border-radius:6px; padding:8px; max-width:100%; }
+.local-shell button { border:1px solid var(--t-border); border-radius:6px; padding:8px 12px; }
+.local-shell button:disabled { opacity:.5; }
+.local-shell summary { cursor:pointer; font-weight:600; }
+.local-shell a { color:var(--t-gold); }
+.local-chart-grid { display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:20px;align-items:start; }
+@media(max-width:850px){.local-chart-grid{grid-template-columns:1fr}.local-shell{padding:20px 12px}}
+@media print { button,nav,input,select,textarea {display:none!important} .local-shell{max-width:none;color:#111} .local-card{break-inside:avoid;background:white;color:#111} }
+.printable-report { display:none; }
+@media print {
+ .local-workspace { display:none!important; }
+ .printable-report { display:block; color:#111; background:white; font-size:11pt; line-height:1.65; }
+ .printable-report h1 { font-size:22pt; margin:12pt 0; }
+ .printable-report h2 { font-size:16pt; margin:12pt 0; }
+ .printable-report .report-section { break-inside:avoid; margin:18pt 0; }
+ .printable-report * { color:#111!important; animation:none!important; transform:none!important; opacity:1!important; }
+}

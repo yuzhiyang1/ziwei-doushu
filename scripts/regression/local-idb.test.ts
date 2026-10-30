@@ -1,0 +1,46 @@
+import 'fake-indexeddb/auto';
+import assert from 'node:assert/strict';
+import { generateChart } from '../../lib/ziwei/algorithm';
+import { saveProfile, listProfiles, deleteProfile, saveChat, loadChat, exportBackup, importBackup, parseBackup, chartId } from '../../lib/local-store';
+
+async function run() {
+  const chart = generateChart({ year: 2000, month: 1, day: 1, hour: 0, gender: 'male', name: '本地测试', birthTimeUnknown: true });
+  assert.equal(chartId(chart, 'natal'), chartId({ ...chart, currentAge: chart.currentAge + 1, currentDaXianIndex: chart.currentDaXianIndex + 1 }, 'natal'), 'history identity must not depend on current age');
+  const configured = { ...chart, birthInfo: { ...chart.birthInfo, schoolConfig: { brightnessSchool: 'XD1' as const, leapMonth: 'split' as const, lateZishi: 'next-day' as const } } };
+  assert.notEqual(chartId(chart), chartId(configured), 'school variants must have isolated identity');
+  await Promise.all([saveProfile(chart.birthInfo), saveProfile(chart.birthInfo)]);
+  let profiles = await listProfiles();
+  assert.equal(profiles.length, 1, 'repeat saves must deduplicate');
+  assert.equal(profiles[0].birth.birthTimeUnknown, true);
+  await saveChat(chart, [{ role: 'user', content: '我的问题' }, { role: 'assistant', content: '离线测试回答' }]);
+  await saveChat(chart, [{ role: 'user', content: '双方问题' }], '双方命盘摘要');
+  assert.equal((await loadChat(chart)).length, 2);
+  assert.equal((await loadChat(chart, '双方命盘摘要'))[0].content, '双方问题');
+  assert.equal((await loadChat(chart, '其他上下文')).length, 0);
+  const backup = await exportBackup();
+  const parsed = parseBackup(backup);
+  assert.equal(parsed.profiles.length, 1);
+  assert.equal(parsed.chats.length, 2);
+  assert(!backup.includes('apiKey'));
+  await deleteProfile(profiles[0].id);
+  await saveChat(chart, []);
+  assert.equal((await listProfiles()).length, 0);
+  assert.equal((await loadChat(chart)).length, 0);
+  await importBackup(backup);
+  assert.equal((await listProfiles()).length, 1);
+  assert.equal((await loadChat(chart)).length, 2);
+  await importBackup(backup);
+  assert.equal((await listProfiles()).length, 1, 'repeat import must deduplicate');
+  const before = await exportBackup();
+  const broken = { ...parsed, profiles: [...parsed.profiles, { birth: { year: 1901, month: 2, day: 29 }, savedAt: 0 }] };
+  await assert.rejects(importBackup(JSON.stringify(broken)));
+  assert.equal(await exportBackup(), before, 'invalid imports must not partially write');
+  const boundedBefore = await exportBackup();
+  await assert.rejects(saveChat(chart, Array.from({ length: 200 }, () => ({ role: 'assistant' as const, content: '字'.repeat(50000) }))));
+  assert.equal(await exportBackup(), boundedBefore, 'oversized saves must abort atomically');
+  await saveChat(chart, []);
+  assert.equal((await loadChat(chart)).length, 0);
+  assert.equal((await loadChat(chart, '双方命盘摘要')).length, 1, 'clear must affect only selected context');
+  console.log('PASS IndexedDB deduplication, persistence across connections, isolated chats, backup roundtrip, rejected-import atomicity (fake-indexeddb)');
+}
+run().catch(e => { console.error(e); process.exitCode = 1; });

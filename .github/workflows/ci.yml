@@ -27,3 +27,8 @@ jobs:
 
       - name: 排盘引擎回归
         run: npm test
+
+      - name: 静态生产构建
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1

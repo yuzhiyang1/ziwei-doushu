@@ -93,12 +93,12 @@ export default function ShareCardCanvas({ chart, birth, highlight }: ShareCardPr
           }}>紫</div>
           <div>
             <div style={{ fontSize: '15px', color: '#3d2f10', fontWeight: 600, letterSpacing: '0.12em', lineHeight: 1.2 }}>紫微命盘</div>
-            <div style={{ fontSize: '9px', color: '#a89b7c', letterSpacing: '0.18em', marginTop: '2px' }}>倪海厦正宗 · ZI WEI</div>
+            <div style={{ fontSize: '9px', color: '#a89b7c', letterSpacing: '0.18em', marginTop: '2px' }}>个人研究 · LOCAL</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <div style={{ fontSize: '10px', color: '#6b5d3f', letterSpacing: '0.05em' }}>
-            {birth.year}年{birth.month}月{birth.day}日 · {birth.hour.padStart(2,'0')}:{birth.minute.padStart(2,'0')}
+            {birth.year}年{birth.month}月{birth.day}日 · {chart.birthInfo.birthTimeUnknown?'时辰未知（子时示例）':chart.birthInfo.origInput?`${birth.hour.padStart(2,'0')}:${birth.minute.padStart(2,'0')}`:`${BRANCH_NAMES[chart.birthInfo.hour]}时（所存参数）`}
             <span style={{ margin: '0 4px', color: '#b8922a' }}>·</span>
             {birth.gender === 'male' ? '男命' : '女命'}
             {birth.city && <><span style={{ margin: '0 4px', color: '#b8922a' }}>·</span>{birth.city}</>}
