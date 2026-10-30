@@ -11,8 +11,8 @@ export default function LocalSchoolSettings({ birth, onChange }: { birth: BirthI
     try { const chart = generateLocalChart(birth, { ...config, [key]: value }); onChange(chart); setError(''); }
     catch (e) { setError(e instanceof Error ? e.message : '流派重算失败'); }
   }
-  return <details className="card-glass p-4 my-3"><summary>排盘口径（9 项可配置）</summary>
-    <p className="text-xs my-2">变更立即重排；请重新保存档案，备份会携带设置。天空“顺加生时”缺少完整公开公式，仍不提供开关。亮度表不改变星曜位置，闰月规则仅影响闰月出生者。</p>
+  return <details className="card-glass p-4 my-3"><summary>排盘口径（10 项可配置）</summary>
+    <p className="text-xs my-2">变更立即重排；请重新保存档案，备份会携带设置。天空备选为公开现代顺加生时规则的独立实现，不声称等于官网私有算法。亮度表不改变星曜位置，闰月规则仅影响闰月出生者。</p>
     <div className="grid gap-3">
       <label>星曜亮度表 <select aria-label="星曜亮度表" value={config.brightnessSchool} onChange={e => update('brightnessSchool', e.target.value as LocalSchoolConfig['brightnessSchool'])}>
         <option value="default">斗数全书（默认）</option><option value="XD1">现代修正 v1</option><option value="XD2">现代修正 v2</option><option value="ZZ">中州派</option>
@@ -29,6 +29,9 @@ export default function LocalSchoolSettings({ birth, onChange }: { birth: BirthI
       <label>天马 <select aria-label="天马" value={config.tianma ?? 'year'} onChange={e => update('tianma', e.target.value as LocalSchoolConfig['tianma'])}>
         <option value="year">年支天马（默认）</option><option value="lunar-month">有效农历月天马（随闰月设置）</option>
       </select></label>
+      <label>天空 <select aria-label="天空" value={config.tiankong ?? 'year'} onChange={e => update('tiankong', e.target.value as LocalSchoolConfig['tiankong'])}>
+        <option value="year">年支下一宫（默认）</option><option value="year-hour">顺加生时（公开规则独立实现）</option>
+      </select>（子=0：年支+1+生时，模12；仅改天空，不改地空/截空/旬空）<a href="https://m.8zml.com/tcn/h-nd-131.html" target="_blank" rel="noreferrer">公开规则说明</a></label>
       <label>截空 <select aria-label="截空" value={config.jiekong ?? 'default'} onChange={e => update('jiekong', e.target.value as LocalSchoolConfig['jiekong'])}>
         <option value="default">原默认截空与副截</option><option value="single">仓库单星表 JK1（不显示副截）</option><option value="zhanyan">仓库占验表 JK3（不显示副截）</option>
       </select>（旬空、副旬不变）</label>

@@ -10,10 +10,19 @@ import { SCHOOL_STAR_ID_TO_NAME, schoolStarBrightness } from './ziwei/school-dat
 
 export const LOCAL_SCHOOL_OPTIONS = {
   gengSihua: ['default', 'GYWTY', 'GYWFT', 'GYWFX', 'GYWTX'],
+  tiankong: ['year', 'year-hour'],
   tianma: ['year', 'lunar-month'], jiekong: ['default', 'single', 'zhanyan'],
   kuiyue: ['default', 'table2', 'table3', 'table4'],
   tianshiTianshang: ['default', 'iztro-zhongzhou'], changsheng: ['default', 'water-earth', 'fire-earth'],
 } as const;
+/** Public modern 顺加生时 convention; not a reconstruction of any private service.
+ * Sources/disambiguation: docs/TIANKONG_RULE.md. Branch/hour indexes: 子=0…亥=11.
+ * Year 子 starts 丑; count that start as 子时 (zero extra steps), then move forward.
+ */
+export function tiankongBranch(yearBranch: number, hour: number, addBirthHour = false): number {
+  if (![yearBranch, hour].every(n => Number.isInteger(n) && n >= 0 && n < 12)) throw new Error('天空年支或时辰索引无效');
+  return (yearBranch + 1 + (addBirthHour ? hour : 0)) % 12;
+}
 export function localSihuaByStem(stemIndex: number, config?: LocalSchoolConfig): { lu: string; quan: string; ke: string; ji: string } {
   let names = SI_HUA_TABLE[stemIndex];
   if (!names) throw new Error('四化天干索引无效');
@@ -48,6 +57,7 @@ export function lifeStageBranches(ju: number, forward: boolean, fireEarth = fals
 /** Operates on a newly generated chart, preserving byte-for-byte default palace output. */
 export function applyLocalSchoolPatches(chart: ZiweiChart, config: LocalSchoolConfig): ZiweiChart {
   const stem = chart.lunarInfo.yearStem;
+  if (config.tiankong === 'year-hour') relocate(chart, '天空', tiankongBranch(chart.lunarInfo.yearBranch, chart.birthInfo.hour, true), config);
   if (config.gengSihua && config.gengSihua !== 'default') {
     const natal = starMap(stem, config);
     for (const p of chart.palaces) {

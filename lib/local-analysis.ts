@@ -27,7 +27,7 @@ const SYMBOLS: Record<string, string> = {
 };
 export function schoolEvidence(chart: ZiweiChart): string {
   const c: LocalSchoolConfig = chart.birthInfo.schoolConfig ?? { brightnessSchool: 'default', leapMonth: 'split', lateZishi: 'next-day' };
-  return `排盘口径：亮度表 ${c.brightnessSchool}；闰月 ${c.leapMonth}；晚子时 ${c.lateZishi}；庚四化 ${c.gengSihua ?? 'default'}；天马 ${c.tianma ?? 'year'}；截空 ${c.jiekong ?? 'default'}（旬空/副旬不变）；魁钺 ${c.kuiyue ?? 'default'}；天使天伤 ${c.tianshiTianshang ?? 'default'}；长生 ${c.changsheng ?? 'default（不显示）'}。天空沿用固定口径，无独立切换。`;
+  return `排盘口径：亮度表 ${c.brightnessSchool}；闰月 ${c.leapMonth}；晚子时 ${c.lateZishi}；庚四化 ${c.gengSihua ?? 'default'}；天马 ${c.tianma ?? 'year'}；截空 ${c.jiekong ?? 'default'}（旬空/副旬不变）；魁钺 ${c.kuiyue ?? 'default'}；天使天伤 ${c.tianshiTianshang ?? 'default'}；长生 ${c.changsheng ?? 'default（不显示）'}。天空 ${c.tiankong ?? 'year'}（year-hour为公开顺加生时独立规则，非官网算法验证）。`;
 }
 export function palaceEvidence(p: Palace): string {
   return `${p.name}（${BRANCHES[p.branch]}）：${p.stars.map(s => `${s.name}${s.brightnessRaw ? `〔${s.brightnessRaw}〕` : ''}${s.siHua ? `化${s.siHua}` : ''}`).join('、') || '无星曜记录'}`;

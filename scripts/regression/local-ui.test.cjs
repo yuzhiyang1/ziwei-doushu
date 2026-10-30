@@ -47,17 +47,35 @@ async function assertChartPainted(page, description) {
  await page.clock.install({time:new Date('2026-10-30T12:00:00Z')});
  page.on('pageerror',e=>errors.push(e.message)); page.on('request',r=>requests.push(r.url()));
  page.on('dialog', dialog => dialog.accept());
- async function birth(scope,name,year='1990') {
+ async function birth(scope,name,year='1990',hour='23',minute='55') {
   await scope.getByPlaceholder('请输入姓名').fill(name);
   await scope.getByLabel('出生年份',{exact:true}).selectOption(year);
   await scope.getByLabel('出生月份',{exact:true}).selectOption('5');
   await scope.getByLabel('出生日期',{exact:true}).selectOption('9');
-  await scope.getByLabel('出生小时',{exact:true}).selectOption('23');
-  await scope.getByLabel('出生分钟',{exact:true}).selectOption('55');
+  await scope.getByLabel('出生小时',{exact:true}).selectOption(hour);
+  await scope.getByLabel('出生分钟',{exact:true}).selectOption(minute);
   await scope.locator('button[type=submit]').click();
  }
  try {
   await page.goto(base+'/chart');
+  // Independent non-子 chart: 1990 午年 branch 6, 08:00 辰时 index 4.
+  // Default 天空=(6+1)%12=7; public year-hour rule=(6+1+4)%12=11.
+  const skyPage=await context.newPage();skyPage.on('pageerror',e=>errors.push(e.message));
+  await skyPage.goto(base+'/chart');await birth(skyPage,'QA天空','1990','8','0');
+  const skyBoard=skyPage.locator('.local-workspace .local-chart-grid');
+  await skyBoard.getByTestId('palace-cell-7').getByText('天空',{exact:true}).waitFor();
+  await skyPage.getByText(/^排盘口径（/).click();
+  assert.equal(await skyPage.getByLabel('天空',{exact:true}).inputValue(),'year');
+  await skyPage.getByLabel('天空',{exact:true}).selectOption('year-hour');
+  await skyBoard.getByTestId('palace-cell-11').getByText('天空',{exact:true}).waitFor();
+  assert.equal(await skyBoard.getByTestId('palace-cell-7').getByText('天空',{exact:true}).count(),0);
+  assert.equal(await skyBoard.getByText('天空',{exact:true}).count(),1,'switch moves rather than duplicates 天空');
+  await skyPage.screenshot({path:'test-results/tiankong-public-rule.png',fullPage:true});
+  await skyPage.getByLabel('天空',{exact:true}).selectOption('year');
+  await skyBoard.getByTestId('palace-cell-7').getByText('天空',{exact:true}).waitFor();
+  assert.equal(await skyBoard.getByTestId('palace-cell-11').getByText('天空',{exact:true}).count(),0);
+  await skyPage.close();
+
   await page.getByLabel('出生年份',{exact:true}).selectOption('1990');
   await page.getByLabel('出生月份',{exact:true}).selectOption('2');
   await page.getByLabel('出生日期',{exact:true}).selectOption('30');
@@ -78,6 +96,8 @@ async function assertChartPainted(page, description) {
   await page.getByLabel('星曜亮度表',{exact:true}).selectOption('ZZ');
   await page.getByLabel('闰月归属',{exact:true}).selectOption('next-month');
   await page.getByLabel('晚子时排盘日',{exact:true}).selectOption('current-day');
+  await page.getByLabel('天空',{exact:true}).selectOption('year-hour');
+  assert.equal(await page.getByLabel('天空',{exact:true}).inputValue(),'year-hour');
   const extraSchools=[['庚年四化','GYWTY','default'],['天马','lunar-month','year'],['截空','zhanyan','default'],['魁钺','table2','default'],['天使天伤','iztro-zhongzhou','default'],['长生十二神','fire-earth','default']];
   for(const [label,alternate,original] of extraSchools) {
    await page.getByLabel(label,{exact:true}).selectOption(alternate);
@@ -95,6 +115,7 @@ async function assertChartPainted(page, description) {
   const backup=await backupDownload, backupText=await fs.readFile(await backup.path(),'utf8');
   assert.equal(JSON.parse(backupText).profiles.length,1); assert.ok(!backupText.includes('apiKey'));
   const savedSchool=JSON.parse(backupText).profiles[0].birth.schoolConfig;
+  assert.equal(savedSchool.tiankong,'year-hour');
   assert.equal(savedSchool.brightnessSchool,'ZZ');assert.equal(savedSchool.leapMonth,'next-month');assert.equal(savedSchool.lateZishi,'current-day');
   assert.equal(JSON.parse(backupText).profiles[0].birth.day,9);
   await page.reload(); await page.getByText(/^本地档案与备份/).click();
@@ -104,6 +125,7 @@ async function assertChartPainted(page, description) {
   assert.equal(await page.getByLabel('星曜亮度表',{exact:true}).inputValue(),'ZZ');
   assert.equal(await page.getByLabel('闰月归属',{exact:true}).inputValue(),'next-month');
   assert.equal(await page.getByLabel('晚子时排盘日',{exact:true}).inputValue(),'current-day');
+  assert.equal(await page.getByLabel('天空',{exact:true}).inputValue(),'year-hour');
   await page.getByRole('button',{name:'搜索本地相似盘'}).click();
   await page.getByText('QA甲 · 结构重合 100%',{exact:true}).waitFor();
   await page.getByRole('button',{name:'删除QA甲档案'}).click();
@@ -114,7 +136,9 @@ async function assertChartPainted(page, description) {
   await page.locator('details').filter({has:page.getByText(/^本地档案与备份/)}).getByRole('status').filter({hasText:/格式|版本|不支持|无效/}).waitFor();
   assert.match(await page.locator('summary').first().innerText(),/（1）/);
   const reportDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出文本报告'}).click();
-  assert.ok((await fs.readFile(await (await reportDownload).path(),'utf8')).length>1000);
+  const exportedReport=await fs.readFile(await (await reportDownload).path(),'utf8');
+  assert.ok(exportedReport.length>1000);assert.ok(exportedReport.includes('天空 year-hour'));
+  assert.ok((await page.locator('.printable-report').textContent()).includes('天空 year-hour'));
   const pngDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'导出本命 PNG'}).click();
   const png=await fs.readFile(await (await pngDownload).path()); assert.equal(png.subarray(1,4).toString(),'PNG'); assert.ok(png.length>10000);
   await assertChartPainted(page,'desktop');
@@ -140,7 +164,7 @@ async function assertChartPainted(page, description) {
   await chat.getByLabel('API Key',{exact:true}).fill('QA-KEY-NOT-PERSISTED');
   await chat.locator('input[type=checkbox]').check();
   let calls=0;
-  await page.route('https://qa.invalid/**',async route=>{calls++;assert.equal(route.request().url(),'https://qa.invalid/v1/chat/completions');assert.equal(route.request().headers().authorization,'Bearer QA-KEY-NOT-PERSISTED');await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({choices:[{message:{content:'MOCK RESPONSE: browser flow only'}}]})});});
+  await page.route('https://qa.invalid/**',async route=>{calls++;assert.equal(route.request().url(),'https://qa.invalid/v1/chat/completions');assert.equal(route.request().headers().authorization,'Bearer QA-KEY-NOT-PERSISTED');const requestBody=route.request().postDataJSON();const system=requestBody.messages[0].content;let aiContext=JSON.parse(system.slice(system.indexOf('命盘：')+3));if(typeof aiContext==='string')aiContext=JSON.parse(aiContext);assert.equal(aiContext.chart.birthInfo.schoolConfig.tiankong,'year-hour');await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({choices:[{message:{content:'MOCK RESPONSE: browser flow only'}}]})});});
   await chat.getByLabel('问答问题').fill('解释当前命盘的依据');
   await chat.getByRole('button',{name:'发送问题'}).click();
   await chat.getByText(/MOCK RESPONSE/).waitFor(); assert.equal(calls,1);

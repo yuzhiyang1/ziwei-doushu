@@ -4,6 +4,7 @@ export interface LocalSchoolConfig {
   lateZishi: 'next-day' | 'current-day';
   gengSihua?: 'default' | 'GYWTY' | 'GYWFT' | 'GYWFX' | 'GYWTX';
   tianma?: 'year' | 'lunar-month';
+  tiankong?: 'year' | 'year-hour';
   jiekong?: 'default' | 'single' | 'zhanyan';
   kuiyue?: 'default' | 'table2' | 'table3' | 'table4';
   tianshiTianshang?: 'default' | 'iztro-zhongzhou';
