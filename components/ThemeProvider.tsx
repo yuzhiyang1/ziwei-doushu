@@ -6,14 +6,14 @@ export type Theme = 'dark' | 'light';
 const ThemeContext = createContext<{
   theme: Theme;
   toggle: () => void;
-}>({ theme: 'dark', toggle: () => {} });
+}>({ theme: 'light', toggle: () => {} });
 
 function getInitialTheme(): Theme {
   if (typeof document !== 'undefined') {
     const attr = document.documentElement.getAttribute('data-theme');
     if (attr === 'light' || attr === 'dark') return attr;
   }
-  return 'dark';
+  return 'light';
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

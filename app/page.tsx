@@ -1,10 +1,2 @@
 import Link from 'next/link';
-export default function Home() {
-  return <main className="local-shell"><p className="local-kicker">PERSONAL · LOCAL FIRST</p><h1>紫微 · 个人研究室</h1><p>不需要注册、订阅或业务后端。排盘与规则解读在浏览器运行，档案由你保管。</p><div className="local-grid">{[
-    ['/chart','排盘与本地档案','六层时间、十三维规则解读、相似盘、报告及 PNG'],
-    ['/heming','双人合盘','两张盘的结构对照，不把相似度解释成关系概率'],
-    ['/library','古籍摘编研读','3本待校勘摘编、搜索与本地笔记'],
-    ['/datasets','公开数据集','按年下载、本地流式索引、精确读取公开十三维原文'],
-    ['/study','三纪研读','公开仓库的学习提要和判语索引'],
-  ].map(([href,title,description])=><Link className="local-card" href={href} key={href}><h2>{title} →</h2><p>{description}</p></Link>)}</div><aside className="local-card"><h2>边界与隐私</h2><p>这是基于 MIT 开源引擎的独立个人版，不是官网专业版解锁器，不含未公开断语库、专属课程或官方 AI 提示词。传统命理仅供文化研究，不用于医疗、投资或关系决策。</p><p>本地档案不是云备份。请定期导出，清除浏览器数据会丢失记录。AI 仅在你配置模型并同意发送时联网，服务商可能收费。</p></aside></main>;
-}
+export default function Home(){return <main className="home-reading"><header><Link href="/" className="brand">紫微<span>个人研究室</span></Link><nav><Link href="/heming">双人合盘</Link><Link href="/study">资料研读</Link></nav></header><section className="home-hero"><span className="eyebrow">本地排盘 · 即刻解读</span><h1>不止看见命盘，<br/>也能读懂它。</h1><p>从你的出生信息出发，阅读十三个生活主题的分析。<br/>先看清特点与张力，再按需用自己的 AI 深入提问。</p><Link className="home-primary" href="/chart">开始排盘与分析 <span>→</span></Link><div className="home-facts"><span>无需登录</span><span>无需 Key 即可读分析</span><span>数据留在本机</span></div></section><section className="home-path"><article><span>01</span><h2>输入出生信息</h2><p>公历日期、时辰与出生地。可选择流派与真太阳时口径。</p></article><article><span>02</span><h2>直接阅读分析</h2><p>命盘总览、特点、注意点与建议。技术依据按需展开，而不是先读一墙星名。</p></article><article><span>03</span><h2>继续深入研读</h2><p>自带模型问答、合盘或公开资料检索，都是可选项，不妨碍直接看分析。</p></article></section><footer><p>独立个人研究工具。传统命理仅作文化研究，不作为科学预测或医疗、投资、关系决策依据。</p><nav><Link href="/library">古籍摘编</Link><Link href="/datasets">公开数据工具</Link><Link href="/study">短引文研读</Link></nav></footer></main>}
