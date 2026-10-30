@@ -44,6 +44,33 @@ async function main() {
   years = await importDatasetFileCore(fixtureRows([row()]));
   assert.equal(years.length, 1); assert.equal(years[0].count, 1); assert.notEqual(years[0].version, originalVersion);
   assert.equal((await findDatasetMatchesCore(chart)).length, 1, 'replacing year removes old active rows');
+  // The years transaction has committed before deleteVersion starts its separate
+  // records+staging cleanup transaction. Abort exactly inside that cleanup,
+  // rather than relying on timers or aborting before the commit point.
+  const committedOldVersion = years[0].version;
+  const postCommitAbort = new AbortController();
+  const originalDelete = IDBObjectStore.prototype.delete;
+  let cleanupAbortObserved = false;
+  IDBObjectStore.prototype.delete = function (this: IDBObjectStore, key: IDBValidKey | IDBKeyRange) {
+    const request = originalDelete.call(this, key);
+    if (this.name === 'staging' && key === committedOldVersion && this.transaction.objectStoreNames.contains('records')) {
+      cleanupAbortObserved = true;
+      postCommitAbort.abort();
+    }
+    return request;
+  };
+  try {
+    years = await importDatasetFileCore(fixtureRows([row(), row(1)]), postCommitAbort.signal);
+  } finally {
+    IDBObjectStore.prototype.delete = originalDelete;
+  }
+  assert.equal(cleanupAbortObserved, true, 'abort must occur during old-version cleanup after metadata commit');
+  assert.equal(postCommitAbort.signal.aborted, true);
+  assert.notEqual(years[0].version, committedOldVersion, 'a post-commit abort must still resolve to the new active version');
+  assert.equal(years[0].count, 2);
+  assert.equal((await listDatasetYearsCore())[0].version, years[0].version, 'new committed metadata must remain active');
+  assert.equal((await findDatasetMatchesCore(chart)).length, 2, 'new committed records must remain searchable');
+  assert.equal(await recordCount(), 2, 'old-version cleanup must finish despite the late abort');
   const report = await readDatasetReportCore(fixtureRows([row(), row(1)]), chart.birthInfo);
   assert.equal(Object.keys(report.dimensions).length, 13); assert.match(report.content, /合成测试报告12/);
   await assert.rejects(readDatasetReportCore(fixtureRows([row(1)]), chart.birthInfo), /没有/);

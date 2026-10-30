@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BirthInfo, ZiweiChart } from '@/lib/ziwei/types';
 import { BRANCHES } from '@/lib/ziwei/constants';
 import manifest from '@/lib/dataset-manifest.json';
+import { generateLocalChart, LOCAL_SCHOOL_DEFAULTS } from '@/lib/local-chart';
 import { deleteDatasetYear, findDatasetMatches, importDatasetFile, listDatasetYears, readDatasetReport, type DatasetMatch, type DatasetProgress, type DatasetReport, type DatasetYear } from '@/lib/local-dataset';
 
 const RELEASE='https://github.com/Renhuai123/ziwei-doushu/releases/tag/v4.0-13d';
@@ -17,13 +18,15 @@ export default function LocalDatasetPanel({chart,onLoad}:{chart?:ZiweiChart|null
  const [progress,setProgress]=useState<DatasetProgress|null>(null),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[cancellable,setCancellable]=useState(true);
  const controller=useRef<AbortController|null>(null), mounted=useRef(true);
  const birthKey=chart?JSON.stringify(chart.birthInfo):'';
+ const matchBirth=useMemo(()=>chart?generateLocalChart({...chart.birthInfo,schoolConfig:{...LOCAL_SCHOOL_DEFAULTS}},{...LOCAL_SCHOOL_DEFAULTS}).birthInfo:null,[birthKey]);
  const refresh=async()=>{const value=await listDatasetYears();if(mounted.current)setYears(value);};
  useEffect(()=>{mounted.current=true;refresh().catch(e=>{if(mounted.current)setStatus(e instanceof Error?e.message:'无法读取本地数据索引');});return()=>{mounted.current=false;controller.current?.abort();};},[]);
  useEffect(()=>{controller.current?.abort();setMatches([]);setReport(null);setStatus('');if(chart && chart.birthInfo.year>=1950 && chart.birthInfo.year<=2026)setDownloadYear(chart.birthInfo.year);},[birthKey]); // Different natal chart must never retain another person's result.
+ // A successful Worker reply means the atomic commit completed, even if cancel arrived during cleanup.
  async function run(action:(signal:AbortSignal,onProgress:(p:DatasetProgress)=>void)=>Promise<string>, canCancel=true) {
   if(controller.current)return;
   const task=new AbortController();controller.current=task;setBusy(true);setCancellable(canCancel);setProgress(null);setStatus('');
-  try {const message=await action(task.signal,p=>{if(mounted.current&&!task.signal.aborted)setProgress(p);});if(mounted.current)setStatus(task.signal.aborted?'操作已取消；未完成的导入不会替换原有年度索引。':message);}
+  try {const message=await action(task.signal,p=>{if(mounted.current&&!task.signal.aborted)setProgress(p);});if(mounted.current)setStatus(message);}
   catch(error){if(mounted.current)setStatus(task.signal.aborted?'操作已取消；未完成的导入不会替换原有年度索引。':error instanceof Error?error.message:'操作失败，请检查文件与浏览器可用存储空间。');}
   finally {try{await refresh();}catch{/* Keep the original error instead of masking it. */}if(controller.current===task)controller.current=null;if(mounted.current){setBusy(false);setProgress(null);}}
  }
@@ -49,14 +52,15 @@ zstd -d --long=27 year-${downloadYear}.jsonl.zst`}</pre><p>先比较校验值，
   </details>
   <h3>1. 导入结构索引</h3>
   <p>Web Worker 分段读取，不把约 700 MB 全文放入内存或 IndexedDB；仅保存用于查找相似盘的紧凑结构索引。按日期/时辰/性别键去重校验；完整年应为8760条（闰年8784条），不足时明确标为部分样本。整份文件校验完成后才原子替换同年索引；取消或错误会保留旧版本。原始 JSONL 请保留，读取全文时需再次选择。浏览器清理数据会删除索引；个人档案备份不包含此公开索引，删除后可重新导入。</p>
-  <label>选择解压后的年度 JSONL <input aria-label="导入公开年度JSONL" type="file" accept=".jsonl,application/x-ndjson" disabled={busy} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!validFile(file))return;run(async(signal,onProgress)=>{const imported=await importDatasetFile(file!,signal,onProgress);return `导入完成：${imported.map(y=>`${y.year} 年 ${y.count} 条`).join('；')}`;});}}/></label>
+  <label>选择解压后的年度 JSONL <input aria-label="导入公开年度JSONL" type="file" accept=".jsonl,application/x-ndjson" disabled={busy} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!validFile(file))return;run(async(signal,onProgress)=>{const imported=await importDatasetFile(file!,signal,onProgress);if(mounted.current)setMatches([]);return `导入完成：${imported.map(y=>`${y.year} 年 ${y.count} 条`).join('；')}`;});}}/></label>
   {busy && <div aria-live="polite"><p>{progress?`${({reading:'读取',indexing:'建立索引',searching:'搜索',report:'读取报告'} as const)[progress.phase]}：${progress.rows.toLocaleString()} 条，${megabytes(progress.bytes)} / ${megabytes(progress.totalBytes)} MB`:'正在准备…'}</p>{progress && <progress aria-label="数据处理进度" max={100} value={percent}/>}<button type="button" disabled={!cancellable} onClick={()=>controller.current?.abort()}>取消数据操作</button></div>}
   <p role="status" data-testid="dataset-status">{status}</p>
-  {years.length===0?<p>尚未导入任何公开数据。其他排盘、原创规则与古籍功能仍可使用。</p>:<ul>{years.map(y=><li key={y.year} className="local-toolbar"><span>{y.year} 年 · {y.count.toLocaleString()} / {expectedYearRows(y.year).toLocaleString()} 条 · {y.count===expectedYearRows(y.year)?'完整年份':'部分样本（非完整年）'} · {y.fileName}</span><button type="button" disabled={busy} aria-label={`删除${y.year}年数据索引`} onClick={()=>{if(window.confirm(`删除 ${y.year} 年公开索引？不会删除你的出生档案或磁盘上的 JSONL 文件。`))run(async()=>{await deleteDatasetYear(y.year);return `${y.year} 年索引已删除`;},false);}}>删除此年索引</button></li>)}</ul>}
+  {years.length===0?<p>尚未导入任何公开数据。其他排盘、原创规则与古籍功能仍可使用。</p>:<ul>{years.map(y=><li key={y.year} className="local-toolbar"><span>{y.year} 年 · {y.count.toLocaleString()} / {expectedYearRows(y.year).toLocaleString()} 条 · {y.count===expectedYearRows(y.year)?'完整年份':'部分样本（非完整年）'} · {y.fileName}</span><button type="button" disabled={busy} aria-label={`删除${y.year}年数据索引`} onClick={()=>{if(window.confirm(`删除 ${y.year} 年公开索引？不会删除你的出生档案或磁盘上的 JSONL 文件。`))run(async()=>{await deleteDatasetYear(y.year);if(mounted.current)setMatches([]);return `${y.year} 年索引已删除`;},false);}}>删除此年索引</button></li>)}</ul>}
   <h3>2. 在已导入样本中匹配</h3>
   {!chart?<p>先在“个人命盘”生成或加载命盘，然后在命盘页使用匹配与全文查询。</p>:<>
-   <p>当前查询键：{birthLabel(chart.birthInfo)}。匹配分数由当前引擎默认口径重算，以“宫名:主星名”集合的 Jaccard 重合度 ×100 计算；不是官方匹配评分，也不是人生相似率、人格概率或预测结论。</p>
+   <p>当前显示命盘 / 精确报告查找键：{birthLabel(chart.birthInfo)}。</p><p>按数据集口径重排后匹配：{matchBirth?birthLabel(matchBirth):'—'}。这不是直接匹配当前自定义盘；先将原始出生输入按默认流派重新排盘（晚子时换日），再与索引对照。匹配分数以“宫名:主星名”集合的 Jaccard 重合度 ×100 计算；不是官方匹配评分，也不是人生相似率、人格概率或预测结论。</p>
    {chart.birthInfo.birthTimeUnknown && <p role="alert">时辰未知：不进行精确报告查询或公开样本匹配，请先确定时辰。</p>}
+   <p>公开报告按上方“精确报告查找键”读取文件，属于用户当前排盘日所选键，不保证与默认重排匹配盘同口径。尤其晚子时、闰月、自选流派不同，请核对两行日期后使用。</p>
    <button type="button" disabled={busy||!canQuery||!years.length} onClick={()=>run(async(signal,onProgress)=>{setMatches([]);const result=await findDatasetMatches(chart,20,signal,onProgress);if(!signal.aborted&&mounted.current)setMatches(result);return result.length?`已匹配 ${result.length} 条；仅搜索已导入年份。`:'已导入样本中没有匹配结果。';})}>匹配已导入样本</button>
    <ol>{matches.map(m=><li key={m.key}><details><summary>{birthLabel(m.birth)} · 结构得分 {m.score}%</summary><p>数据来源：{m.source}；记录键：{m.key}</p>{onLoad && <button type="button" disabled={busy} onClick={()=>{setMatches([]);setReport(null);onLoad(m.birth);}}>载入此样本命盘</button>}</details></li>)}</ol>
    <h3>3. 读取当前盘公开十三维原文</h3>
