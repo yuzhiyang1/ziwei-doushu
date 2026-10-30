@@ -100,7 +100,8 @@ async function assertInitialReading(page, name) {
   await skyPage.goto(base+'/chart');await birth(skyPage,'QA天空','1990','8','0');
   await assertInitialReading(skyPage,'desktop');
   const firstSummary=await skyPage.getByTestId('reading-summary').innerText();
-  assert.match(firstSummary,/命宫紫微、破军着重统筹与授权与调整与重建/,'actual chart star combination is explained, not just listed');
+  for(const concept of ['紫微','破军','统筹','重建']) assert.ok(firstSummary.includes(concept),`actual chart explanation includes ${concept}`);
+  assert.match(await skyPage.getByTestId('readable-analysis').locator('.reading-columns').innerText(),/控制|推翻|成本|忽略|过渡/,'specific tension must accompany positive traits');
   await openAdvanced(skyPage);
   const skyBoard=skyPage.locator('.local-workspace .chart-pane');
   await skyBoard.getByTestId('palace-cell-7').getByText('天空',{exact:true}).waitFor();

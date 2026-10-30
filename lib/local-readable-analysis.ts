@@ -1,5 +1,5 @@
 /** Locally authored traditional-symbol commentary: no model, network or private text corpus. */
-import { buildPeriodAnalysis, type PeriodAnalysisSection, type PeriodEvidence } from './local-period-analysis';
+import { buildPeriodAnalysis, normalizePeriodPalace, type PeriodAnalysisSection, type PeriodEvidence } from './local-period-analysis';
 import { resolveTimeContext, TIME_LABELS, type TimeContext, type TimeSelection } from './local-time';
 import { BRANCHES } from './ziwei/constants';
 import type { ZiweiChart } from './ziwei/types';
@@ -73,14 +73,22 @@ export function buildReadableAnalysis(chart:ZiweiChart,selection:TimeSelection,c
  const sections=buildPeriodAnalysis(chart,selection,context),details=sections.slice(1).map(s=>sectionText(s,selection));
  const get=(name:string)=>sections.find(s=>s.period?.themePalace===name)!.period!;
  const ming=get('命宫'),wealth=get('财帛宫'),career=get('官禄宫'),couple=get('夫妻宫');
- const short=(name:string,p:PeriodEvidence)=>{const hua=[...p.natalStars.filter(s=>s.siHua).map(s=>`生年${s.name}化${s.siHua}`),...p.periodHua.map(h=>`本层${h.star}化${h.hua}`)];return `${name}${locatedStars(p)}，着重${rules(p).map(r=>r.focus).join('与')||'整合关联宫位'}${hua.length?`（${hua.join('、')}）`:''}。`;};
+ const m=rules(ming)[0],c=rules(career)[0],second=rules(ming)[1];
  const shen=chart.palaces.find(p=>p.branch===chart.shenGongBranch)!;
- const summary=short('命宫',ming)+short('财帛',wealth)+short('官禄',career)+short('夫妻',couple)+`合起来看，可先用行动方式确定目标，再检查资源能否支持工作安排，并为关系沟通留下空间。身宫落${shen.name}，可把${THEMES[shen.name]?.name??'这一生活主题'}作为持续实践的关注点。`+(chart.birthInfo.birthTimeUnknown?'时辰未知，当前只展示子时示例，以上主题需待输入确定后重看。':'这些方向需要用真实经历逐项核对；相互牵连的需要，应通过具体安排协调，而不是简单评为好或坏。');
- const m=rules(ming)[0],c=rules(career)[0];
+ const shenName=normalizePeriodPalace(shen.name);
+ const natalHua=ming.natalStars.find(s=>s.siHua),periodHua=ming.periodHua[0];
+ const mainHua=periodHua?`本层${periodHua.star}化${periodHua.hua}，${HUA[periodHua.hua]}。`:natalHua?`生年${natalHua.name}化${natalHua.siHua}，${HUA[natalHua.siHua!]}。`:'';
+ const opening=`命宫${locatedStars(ming)}。${m?.meaning??'本宫及对宫没有主星时，先从实际经历和三合宫位寻找可用的支持，而不把空宫理解为没有方向。'}`;
+ const contrast=second?`${second.meaning}两种取向需要协调：${m?.tension??second.tension}`:m?m.tension:'';
+ const short=(name:string,p:PeriodEvidence)=>`${name}${locatedStars(p)}，可关注${rules(p)[0]?.focus??'现实支持'}。`;
+ const basis=opening+contrast+short('财帛',wealth)+short('官禄',career)+short('夫妻',couple)+`身宫落${shenName}，宜把${THEMES[shenName]?.name??'相应生活安排'}落实为持续实践。`;
+ // Keep the overview readable; full four-transformations remain in evidence chips and each topic.
+ const closing=chart.birthInfo.birthTimeUnknown?'时辰未知，以上仅为子时示例，需确定输入后重看。':'将这些观察与真实经历核对，再协调资源、工作和关系的具体安排。';
+ const summary=basis+(basis.length+mainHua.length+closing.length<=300?mainHua:'')+closing;
  const overview:ReadableAnalysisSection={id:'overview',title:`总览 · ${TIME_LABELS[selection.view]}可读解读`,headline:`先看${m?.focus??'关联宫位'}，再协调资源、工作与关系`,summary,
   strengths:[m?.strength??'从命宫对宫与三合中比较不同路径，有助于拓展观察角度。',c?.strength??'把工作目标拆为可验证步骤，有助于看清现实支持。'],
   watchouts:[m?.tension??'空宫不是没有方向，也不宜把对宫特征全部套在自己身上。','资源、工作和关系的需要可能不同；不要让一个领域的投入自动替代另一领域的沟通。'],
   suggestions:[m?.action??'从最关心的一个领域开始，写下现状、证据与下一步。','分别记录一项预算安排、一项工作目标与一次关系协商，再检查它们是否互相挤占。'],
-  evidenceChips:[`当前层：${TIME_LABELS[selection.view]}`,`身宫：${shen.name}`, ...[ming,wealth,career,couple].flatMap(p=>[`${p.themePalace}：${locatedStars(p)}`,...p.natalStars.filter(s=>s.siHua).map(s=>`生年${s.name}化${s.siHua}`),...p.periodHua.map(h=>`${TIME_LABELS[selection.view]}${h.star}化${h.hua}`)])],sourceNote:READABLE_SOURCE_NOTE};
+  evidenceChips:[`当前层：${TIME_LABELS[selection.view]}`,`身宫：${shenName}`, ...[ming,wealth,career,couple].flatMap(p=>[`${p.themePalace}：${locatedStars(p)}`,...p.natalStars.filter(s=>s.siHua).map(s=>`生年${s.name}化${s.siHua}`),...p.periodHua.map(h=>`${TIME_LABELS[selection.view]}${h.star}化${h.hua}`)])],sourceNote:READABLE_SOURCE_NOTE};
  return [overview,...details];
 }
